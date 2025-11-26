@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  name            String?
+  profileImageUrl String?   @map("profile_image_url")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  carts           Cart[]
+  recommendations Recommendation[]
+
+  @@map("users")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  externalId  String?  @unique @map("external_id")
+  name        String
+  price       Int
+  category    String?
+  imageUrl    String?  @map("image_url")
+  rating      Decimal? @db.Decimal(2, 1)
+  reviewCount Int?     @map("review_count")
+  platform    String?
+  url         String?
+  lastUpdated DateTime @default(now()) @map("last_updated")
+
+  cartItems CartItem[]
+
+  @@index([category])
+  @@index([price])
+  @@map("products")
+}
+
+model Cart {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  name       String?
+  budget     Int?
+  totalPrice Int      @map("total_price")
+  cartCode   String?  @unique @map("cart_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user            User             @relation(fields: [userId], references: [id])
+  cartItems       CartItem[]
+  recommendations Recommendation[]
+
+  @@index([userId])
+  @@index([cartCode])
+  @@map("carts")
+}
+
+model CartItem {
+  id              String @id @default(uuid())
+  cartId          String @map("cart_id")
+  productId       String @map("product_id")
+  quantity        Int    @default(1)
+  priceAtAddition Int    @map("price_at_addition")
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("cart_items")
+}
+
+model Recommendation {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  budget           Int
+  category         String?
+  cartId           String?  @map("cart_id")
+  algorithmVersion String   @map("algorithm_version")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User  @relation(fields: [userId], references: [id])
+  cart Cart? @relation(fields: [cartId], references: [id])
+
+  @@map("recommendations")
+}
