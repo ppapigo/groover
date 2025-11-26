@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Build & Production
+build/
+dist/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# React Native
+.expo/
+.expo-shared/
+
+# Android
+*.apk
+*.aab
+*.dex
+groover-app/android/app/build/
+groover-app/android/.gradle/
+*.keystore
+
+# iOS
+groover-app/ios/Pods/
+groover-app/ios/build/
+*.ipa
+*.xcuserstate
+groover-app/ios/*.xcworkspace
+!groover-app/ios/*.xcworkspace/contents.xcworkspacedata
+
+# Database
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+groover-ai/venv/
+groover-ai/ENV/
+
+# Secrets
+*secret*
+*.pem
+*.key
