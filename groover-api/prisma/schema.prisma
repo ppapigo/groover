@@ -1,3 +1,6 @@
+// prisma/schema.prisma
+// Groover - AI 기반 스마트 장바구니 추천 서비스
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,83 +10,257 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== USER ====================
 model User {
   id              String    @id @default(uuid())
   email           String    @unique
   passwordHash    String    @map("password_hash")
   name            String?
   profileImageUrl String?   @map("profile_image_url")
+  preferences     Json?     // 사용자 선호도 (브랜드, 카테고리 등)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-
+  
   carts           Cart[]
   recommendations Recommendation[]
-
+  budgetProfiles  BudgetProfile[]
+  
   @@map("users")
 }
 
-model Product {
+// ==================== BUDGET ====================
+model BudgetProfile {
   id          String   @id @default(uuid())
-  externalId  String?  @unique @map("external_id")
-  name        String
-  price       Int
-  category    String?
-  imageUrl    String?  @map("image_url")
-  rating      Decimal? @db.Decimal(2, 1)
-  reviewCount Int?     @map("review_count")
-  platform    String?
-  url         String?
-  lastUpdated DateTime @default(now()) @map("last_updated")
+  userId      String   @map("user_id")
+  name        String   // "이번 달 장보기", "주간 식료품" 등
+  totalBudget Int      @map("total_budget")
+  currency    String   @default("KRW")
+  isDefault   Boolean  @default(false) @map("is_default")
+  categories  Json?    // 카테고리별 비율 및 우선순위
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+  
+  @@index([userId])
+  @@map("budget_profiles")
+}
 
-  cartItems CartItem[]
-
-  @@index([category])
-  @@index([price])
+// ==================== PRODUCT ====================
+model Product {
+  id            String   @id @default(uuid())
+  externalId    String?  @unique @map("external_id")
+  name          String
+  normalizedName String? @map("normalized_name") // 검색용 정규화 이름
+  description   String?
+  price         Int
+  originalPrice Int?     @map("original_price") // 정가 (할인 전)
+  category      String
+  subcategory   String?
+  brand         String?
+  imageUrl      String?  @map("image_url")
+  tags          String[] @default([])
+  
+  // 스코어링용
+  rating        Decimal? @db.Decimal(2, 1)
+  reviewCount   Int      @default(0) @map("review_count")
+  popularityScore Float? @default(0) @map("popularity_score")
+  
+  // 출처 정보
+  source        String   @default("manual") // "coupang", "naver", "manual"
+  sourceUrl     String?  @map("source_url")
+  metadata      Json?
+  
+  // 상태
+  isActive      Boolean  @default(true) @map("is_active")
+  lastSynced    DateTime @default(now()) @map("last_synced")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  cartItems     CartItem[]
+  productSources ProductSource[]
+  
+  @@index([category, price])
+  @@index([source])
+  @@index([rating, reviewCount])
+  @@index([isActive])
+  @@index([normalizedName])
   @@map("products")
 }
 
+// ==================== PRODUCT SOURCE ====================
+// 각 쇼핑몰별 상품 정보
+model ProductSource {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  platform      String   // "COUPANG", "NAVER", "ELEVENST" 등
+  externalId    String?  @map("external_id") // 외부 플랫폼 상품 ID
+  price         Int
+  url           String?
+  searchQuery   String?  @map("search_query") // URL 생성용 검색 쿼리
+  availability  String   @default("UNKNOWN") // "AVAILABLE", "OUT_OF_STOCK", "DISCONTINUED"
+  lastCheckedAt DateTime? @map("last_checked_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([productId, platform])
+  @@index([platform])
+  @@map("product_sources")
+}
+
+// ==================== CART ====================
 model Cart {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  name       String?
-  budget     Int?
-  totalPrice Int      @map("total_price")
-  cartCode   String?  @unique @map("cart_code")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  user            User             @relation(fields: [userId], references: [id])
-  cartItems       CartItem[]
-  recommendations Recommendation[]
-
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  recommendationId String?  @unique @map("recommendation_id")
+  name             String?
+  budget           Int?
+  totalPrice       Int      @default(0) @map("total_price")
+  itemCount        Int      @default(0) @map("item_count")
+  grooverCode      String?  @unique @map("groover_code") // Groover Code
+  isPublic         Boolean  @default(false) @map("is_public")
+  viewCount        Int      @default(0) @map("view_count")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartItems        CartItem[]
+  
   @@index([userId])
-  @@index([cartCode])
+  @@index([grooverCode])
   @@map("carts")
 }
 
+// ==================== CART ITEM ====================
 model CartItem {
-  id              String @id @default(uuid())
-  cartId          String @map("cart_id")
-  productId       String @map("product_id")
-  quantity        Int    @default(1)
-  priceAtAddition Int    @map("price_at_addition")
-
-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
-
+  id              String   @id @default(uuid())
+  cartId          String   @map("cart_id")
+  productId       String   @map("product_id")
+  quantity        Int      @default(1)
+  priceAtAddition Int      @map("price_at_addition")
+  scoreAtAdd      Float?   @map("score_at_add")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+  
+  @@unique([cartId, productId])
   @@map("cart_items")
 }
 
+// ==================== RECOMMENDATION ====================
 model Recommendation {
   id               String   @id @default(uuid())
   userId           String   @map("user_id")
-  budget           Int
-  category         String?
-  cartId           String?  @map("cart_id")
-  algorithmVersion String   @map("algorithm_version")
+  budgetProfileId  String?  @map("budget_profile_id")
+  
+  // 요청 정보
+  requestPayload   Json?    @map("request_payload")
+  totalBudget      Int      @map("total_budget")
+  
+  // 결과
+  status           String   @default("PENDING") // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  resultPayload    Json?    @map("result_payload")
+  grooverCode      String?  @unique @map("groover_code")
+  
+  // 요약
+  totalPrice       Int?     @map("total_price")
+  totalItems       Int?     @map("total_items")
+  savedAmount      Int?     @map("saved_amount")
+  
+  // AI 관련
+  usedAi           Boolean  @default(false) @map("used_ai")
+  aiExplanation    String?  @map("ai_explanation")
+  aiTokensUsed     Int?     @map("ai_tokens_used")
+  
+  // 알고리즘 정보
+  algorithmVersion String   @default("v1") @map("algorithm_version")
+  processingTimeMs Int?     @map("processing_time_ms")
+  
   createdAt        DateTime @default(now()) @map("created_at")
-
-  user User  @relation(fields: [userId], references: [id])
-  cart Cart? @relation(fields: [cartId], references: [id])
-
+  expiresAt        DateTime? @map("expires_at")
+  
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetProfile    BudgetProfile? @relation(fields: [budgetProfileId], references: [id])
+  
+  @@index([userId])
+  @@index([grooverCode])
+  @@index([status])
   @@map("recommendations")
+}
+
+// ==================== GROOVER CODE LOG ====================
+model GrooverCodeLog {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  version     Int      @default(1)
+  encodedData String   @map("encoded_data")
+  checksum    String
+  creatorId   String?  @map("creator_id")
+  itemCount   Int      @map("item_count")
+  totalPrice  Int      @map("total_price")
+  decodeCount Int      @default(0) @map("decode_count")
+  saveCount   Int      @default(0) @map("save_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
+  
+  @@index([code])
+  @@index([createdAt])
+  @@map("groover_code_logs")
+}
+
+// ==================== LOGGING ====================
+model UsageLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String   // "RECOMMEND", "DECODE", "SAVE_CART", "CLICK_LINK" 등
+  metadata  Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("usage_logs")
+}
+
+model AiCallLog {
+  id               String   @id @default(uuid())
+  userId           String?  @map("user_id")
+  recommendationId String?  @map("recommendation_id")
+  provider         String   // "CLAUDE", "OPENAI" 등
+  model            String
+  promptHash       String   @map("prompt_hash")
+  inputTokens      Int      @map("input_tokens")
+  outputTokens     Int      @map("output_tokens")
+  totalTokens      Int      @map("total_tokens")
+  costUsd          Float?   @map("cost_usd")
+  latencyMs        Int      @map("latency_ms")
+  success          Boolean
+  errorMessage     String?  @map("error_message")
+  cacheHit         Boolean  @default(false) @map("cache_hit")
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  @@index([promptHash])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_call_logs")
+}
+
+// ==================== CACHE ====================
+model RecommendationCache {
+  id            String   @id @default(uuid())
+  cacheKey      String   @unique @map("cache_key")
+  resultPayload Json     @map("result_payload")
+  hitCount      Int      @default(0) @map("hit_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  expiresAt     DateTime @map("expires_at")
+  
+  @@index([cacheKey])
+  @@index([expiresAt])
+  @@map("recommendation_cache")
 }
