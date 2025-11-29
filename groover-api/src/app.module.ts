@@ -6,6 +6,8 @@ import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { CartsModule } from './carts/carts.module';
+import { GrooverCodeModule } from './groover-code/groover-code.module';
+
 
 @Module({
   imports: [
@@ -19,6 +21,7 @@ import { CartsModule } from './carts/carts.module';
     ProductsModule,
     RecommendationsModule,
     CartsModule,
+    GrooverCodeModule,
   ],
   controllers: [],
   providers: [],
