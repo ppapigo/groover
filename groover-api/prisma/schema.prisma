@@ -24,9 +24,58 @@ model User {
   carts           Cart[]
   recommendations Recommendation[]
   budgetProfiles  BudgetProfile[]
+  conversations   Conversation[]
+   posts     Post[]
+   postLikes PostLike[]
   
   @@map("users")
 }
+model Conversation {
+  id                      String    @id @default(uuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status                  String    @default("ACTIVE")  // ACTIVE, COMPLETED, ABANDONED
+  
+  // 현재 대화 상태
+  currentRecommendationId String?
+  currentContext          Json?     // 파싱된 컨텍스트 (예산, 선호도 등)
+  
+  messages                ConversationMessage[]
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+model ConversationMessage {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role            String       // USER, ASSISTANT
+  content         String       // 원본 메시지
+  
+  // 파싱 결과 (USER 메시지인 경우)
+  parsedIntent    String?      // CREATE_CART, REFINE_CART, QUESTION, etc.
+  parsedParams    Json?        // 추출된 파라미터
+  usedLlm         Boolean      @default(false)  // LLM 사용 여부
+  
+  // 응답 메타데이터 (ASSISTANT 메시지인 경우)
+  recommendationId  String?
+  processingTimeMs  Int?
+  
+  createdAt       DateTime     @default(now())
+  
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+
+
 
 // ==================== BUDGET ====================
 model BudgetProfile {
@@ -184,6 +233,7 @@ model Recommendation {
   expiresAt        DateTime? @map("expires_at")
   
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   history         RecommendationHistory[]  
   budgetProfile    BudgetProfile? @relation(fields: [budgetProfileId], references: [id])
   
   @@index([userId])
@@ -191,7 +241,115 @@ model Recommendation {
   @@index([status])
   @@map("recommendations")
 }
+// ============================================
+// Recommendation History (추천 수정 이력)
+// ============================================
 
+model RecommendationHistory {
+  id                String         @id @default(uuid())
+  recommendationId  String
+  recommendation    Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  
+  version           Int
+  action            String         // CREATED, REFINED, RESTORED
+  changes           Json           // 변경 내용
+  previousState     Json?          // 이전 상태
+  
+  createdAt         DateTime       @default(now())
+  
+  @@index([recommendationId])
+  @@index([createdAt])
+}
+// prisma/schema.prisma 에 추가할 내용
+// ============================================
+// Blog Models (쇼핑 기반 블로그)
+// ============================================
+
+model Post {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  content       String    // HTML/Markdown
+  previewImage  String?   // 대표 이미지 URL
+  tags          String[]  // 태그 배열
+  
+  // SEO
+  slug          String    @unique  // URL-friendly slug
+  excerpt       String?   // 요약 (미리보기용)
+  
+  // 통계
+  viewCount     Int       @default(0)
+  likeCount     Int       @default(0)
+  
+  // 상태
+  status        String    @default("DRAFT")  // DRAFT, PUBLISHED, HIDDEN
+  publishedAt   DateTime?
+  
+  // 파트너스 관련
+  hasAffiliateLinks  Boolean  @default(false)  // 파트너스 링크 포함 여부
+  
+  // 관계
+  products      PostProduct[]
+  likes         PostLike[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([slug])
+  @@index([tags])
+}
+
+model PostProduct {
+  id            String    @id @default(uuid())
+  postId        String
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  // 상품 정보
+  productId     String    // 외부 파트너스 상품 ID
+  source        String    // "coupang" | "naver" | "internal"
+  
+  // 캐시된 상품 정보 (API 호출 최소화)
+  name          String
+  image         String?
+  price         Int?
+  currency      String    @default("KRW")
+  originalUrl   String    // 원본 URL
+  affiliateUrl  String    // 파트너스 링크 (수익 발생)
+  
+  // 본문 내 위치 (순서)
+  position      Int       @default(0)
+  
+  // 캐시 상태
+  lastFetchedAt DateTime  @default(now())  // 마지막 API 호출 시간
+  fetchStatus   String    @default("SUCCESS")  // SUCCESS, FAILED, PENDING
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([postId])
+  @@index([source])
+  @@index([updatedAt])  // 캐시 갱신 배치용
+  @@unique([postId, productId, source])  // 같은 글에 같은 상품 중복 방지
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([postId, userId])  // 한 유저가 같은 글에 중복 좋아요 방지
+  @@index([postId])
+  @@index([userId])
+}
 // ==================== GROOVER CODE LOG ====================
 model GrooverCodeLog {
   id          String   @id @default(uuid())
