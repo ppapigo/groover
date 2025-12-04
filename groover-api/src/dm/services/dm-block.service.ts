@@ -109,7 +109,7 @@ export class DmBlockService {
       where: { blockerId: userId },
       include: {
         blocked: {
-          select: { id: true, name: true, profileImage: true },
+          select: { id: true, name: true, profileImageUrl: true },
         },
       },
       orderBy: { createdAt: 'desc' },

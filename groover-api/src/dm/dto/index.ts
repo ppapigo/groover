@@ -1,11 +1,15 @@
-// src/dm/dto/send-message.dto.ts
+// src/dm/dto/index.ts
 import {
   IsString,
   IsOptional,
   IsEnum,
   MaxLength,
   IsObject,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum MessageType {
   TEXT = 'text',
@@ -34,7 +38,6 @@ export class SendMessageDto {
   };
 }
 
-// src/dm/dto/start-thread.dto.ts
 export class StartThreadDto {
   @IsString()
   targetUserId: string;
@@ -44,10 +47,6 @@ export class StartThreadDto {
   @MaxLength(2000)
   initialMessage?: string;
 }
-
-// src/dm/dto/thread-query.dto.ts
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class ThreadQueryDto {
   @IsOptional()
@@ -75,13 +74,11 @@ export class MessageQueryDto {
   limit?: number = 50;
 }
 
-// src/dm/dto/block.dto.ts
 export class BlockUserDto {
   @IsString()
   targetUserId: string;
 }
 
-// src/dm/dto/report.dto.ts
 export class ReportMessageDto {
   @IsString()
   targetUserId: string;
@@ -95,7 +92,6 @@ export class ReportMessageDto {
   reason: string;
 }
 
-// src/dm/dto/search.dto.ts
 export class SearchMessagesDto {
   @IsString()
   @MaxLength(100)

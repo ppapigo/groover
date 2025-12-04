@@ -62,7 +62,7 @@ export class DmSearchService {
         },
       },
       include: {
-        sender: { select: { id: true, name: true, profileImage: true } },
+        sender: { select: { id: true, name: true, profileImageUrl: true } },
         thread: {
           include: {
             user1: { select: { id: true, name: true } },

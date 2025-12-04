@@ -25,8 +25,24 @@ model User {
   recommendations Recommendation[]
   budgetProfiles  BudgetProfile[]
   conversations   Conversation[]
-   posts     Post[]
-   postLikes PostLike[]
+  posts     Post[]
+  postLikes PostLike[]
+   // DM 관계
+  dmThreadsAsUser1  DmThread[]  @relation("DmThreadUser1")
+  dmThreadsAsUser2  DmThread[]  @relation("DmThreadUser2")
+  dmMessages        DmMessage[]
+  dmBlocksMade      DmBlock[]   @relation("DmBlocker")
+  dmBlocksReceived  DmBlock[]   @relation("DmBlocked")
+  dmReportsMade     DmReport[]  @relation("DmReporter")
+  dmReportsReceived DmReport[]  @relation("DmReported")
+  adProposalsSent      AdProposal[]  @relation("AdProposalAdvertiser")
+  adProposalsReceived  AdProposal[]  @relation("AdProposalCreator")
+  adPayments           AdPayment[]
+  wallet               Wallet?
+  settlements          Settlement[]
+  withdrawals          Withdrawal[]
+
+
   
   @@map("users")
 }
@@ -421,4 +437,325 @@ model RecommendationCache {
   @@index([cacheKey])
   @@index([expiresAt])
   @@map("recommendation_cache")
+}
+// ============================================
+// DM (Direct Message) Models
+// ============================================
+
+model DmThread {
+  id              String    @id @default(uuid())
+  
+  // 참여자 (항상 user1Id < user2Id 로 정렬하여 중복 방지)
+  user1Id         String
+  user1           User      @relation("DmThreadUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2Id         String
+  user2           User      @relation("DmThreadUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  
+  // 마지막 메시지 캐시 (리스트 조회 최적화)
+  lastMessage     String?
+  lastMessageAt   DateTime?
+  
+  // 안읽음 카운트
+  unreadCountUser1  Int     @default(0)
+  unreadCountUser2  Int     @default(0)
+  
+  // 메시지 관계
+  messages        DmMessage[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([user1Id, user2Id])  // 같은 두 사용자 간 스레드 중복 방지
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([lastMessageAt])
+
+  adProposals          AdProposal[]
+}
+
+model DmMessage {
+  id            String    @id @default(uuid())
+  
+  threadId      String
+  thread        DmThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  senderId      String
+  sender        User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  // 메시지 내용
+  content       String
+  messageType   String    @default("text")  // text, image, link, system
+  
+  // 메타데이터 (이미지 URL, 링크 미리보기 등)
+  metadata      Json?
+  
+  // 읽음 상태
+  isRead        Boolean   @default(false)
+  readAt        DateTime?
+  
+  createdAt     DateTime  @default(now())
+  
+  // 신고 관계
+  reports       DmReport[]
+  
+  @@index([threadId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model DmBlock {
+  id          String    @id @default(uuid())
+  
+  blockerId   String
+  blocker     User      @relation("DmBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  
+  blockedId   String
+  blocked     User      @relation("DmBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  
+  @@unique([blockerId, blockedId])  // 중복 차단 방지
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model DmReport {
+  id          String    @id @default(uuid())
+  
+  reporterId  String
+  reporter    User      @relation("DmReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  reportedId  String
+  reported    User      @relation("DmReported", fields: [reportedId], references: [id], onDelete: Cascade)
+  
+  messageId   String?
+  message     DmMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  
+  reason      String
+  status      String    @default("PENDING")  // PENDING, REVIEWED, RESOLVED, DISMISSED
+  
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+  
+  @@index([reporterId])
+  @@index([reportedId])
+  @@index([status])
+}
+// 광고 제안 (DM 기반)
+model AdProposal {
+  id              String    @id @default(uuid())
+  
+  // 광고주 → 유저
+  advertiserId    String
+  advertiser      User      @relation("AdProposalAdvertiser", fields: [advertiserId], references: [id], onDelete: Cascade)
+  
+  creatorId       String
+  creator         User      @relation("AdProposalCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  // DM 스레드 연결 (선택)
+  threadId        String?
+  thread          DmThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  
+  // 제안 내용
+  title           String              // 광고 제목
+  description     String              // 상세 설명
+  budget          Int                 // 광고비 (원)
+  requirements    String?             // 요구사항
+  deadline        DateTime?           // 마감일
+  
+  // 상태
+  status          AdProposalStatus    @default(PENDING)
+  
+  // 결제/정산 연결
+  payment         AdPayment?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  respondedAt     DateTime?           // 수락/거절 시간
+  
+  @@index([advertiserId])
+  @@index([creatorId])
+  @@index([status])
+}
+
+enum AdProposalStatus {
+  PENDING       // 대기중
+  ACCEPTED      // 수락됨
+  REJECTED      // 거절됨
+  PAID          // 결제완료
+  IN_PROGRESS   // 진행중
+  COMPLETED     // 완료
+  CANCELLED     // 취소
+  DISPUTED      // 분쟁중
+}
+
+// 광고비 결제
+model AdPayment {
+  id              String    @id @default(uuid())
+  
+  proposalId      String    @unique
+  proposal        AdProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  
+  // 결제자 (광고주)
+  payerId         String
+  payer           User      @relation(fields: [payerId], references: [id], onDelete: Cascade)
+  
+  // 금액
+  amount          Int                 // 총 결제액
+  platformFee     Int                 // 플랫폼 수수료 (15%)
+  creatorAmount   Int                 // 크리에이터 수령액
+  feeRate         Float     @default(0.15)  // 수수료율
+  
+  // 토스페이먼츠
+  tossPaymentKey  String?             // 토스 결제키
+  tossOrderId     String    @unique   // 주문 ID
+  method          String?             // 카드, 계좌이체 등
+  
+  // 상태
+  status          PaymentStatus @default(PENDING)
+  
+  // 정산 연결
+  settlement      Settlement?
+  
+  createdAt       DateTime  @default(now())
+  paidAt          DateTime?
+  cancelledAt     DateTime?
+  
+  @@index([payerId])
+  @@index([status])
+}
+
+enum PaymentStatus {
+  PENDING       // 대기
+  COMPLETED     // 완료
+  CANCELLED     // 취소
+  REFUNDED      // 환불
+  FAILED        // 실패
+}
+
+// 유저 지갑
+model Wallet {
+  id              String    @id @default(uuid())
+  
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 잔액
+  balance         Int       @default(0)       // 현재 잔액
+  pendingBalance  Int       @default(0)       // 정산 대기 금액
+  totalEarned     Int       @default(0)       // 누적 수익
+  totalWithdrawn  Int       @default(0)       // 누적 출금
+  
+  // KYC (계좌인증)
+  isVerified      Boolean   @default(false)
+  bankName        String?                     // 은행명
+  bankAccount     String?                     // 계좌번호 (암호화)
+  accountHolder   String?                     // 예금주
+  verifiedAt      DateTime?
+  
+  // 거래 내역
+  transactions    WalletTransaction[]
+  withdrawals     Withdrawal[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// 지갑 거래 내역
+model WalletTransaction {
+  id              String    @id @default(uuid())
+  
+  walletId        String
+  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  type            TransactionType
+  amount          Int                         // 금액 (+/-)
+  balance         Int                         // 거래 후 잔액
+  
+  // 관련 정보
+  description     String
+  referenceId     String?                     // 관련 ID (결제ID, 출금ID 등)
+  referenceType   String?                     // PAYMENT, WITHDRAWAL, ADJUSTMENT
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([walletId])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  EARNING       // 수익 (광고비 수령)
+  WITHDRAWAL    // 출금
+  REFUND        // 환불
+  ADJUSTMENT    // 조정
+}
+
+// 정산
+model Settlement {
+  id              String    @id @default(uuid())
+  
+  paymentId       String    @unique
+  payment         AdPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  
+  // 수령자
+  recipientId     String
+  recipient       User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  amount          Int                         // 정산 금액
+  status          SettlementStatus @default(PENDING)
+  
+  // 정산 완료 시
+  settledAt       DateTime?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([recipientId])
+  @@index([status])
+}
+
+enum SettlementStatus {
+  PENDING       // 대기 (작업 완료 전)
+  READY         // 정산 가능
+  COMPLETED     // 지갑에 입금됨
+  FAILED        // 실패
+}
+
+// 출금 요청
+model Withdrawal {
+  id              String    @id @default(uuid())
+  
+  walletId        String
+  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount          Int                         // 출금 금액
+  fee             Int       @default(0)       // 출금 수수료
+  netAmount       Int                         // 실수령액
+  
+  // 계좌 정보 (출금 시점 스냅샷)
+  bankName        String
+  bankAccount     String
+  accountHolder   String
+  
+  status          WithdrawalStatus @default(PENDING)
+  
+  // 처리 정보
+  processedAt     DateTime?
+  rejectedReason  String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([walletId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum WithdrawalStatus {
+  PENDING       // 대기
+  PROCESSING    // 처리중
+  COMPLETED     // 완료
+  REJECTED      // 거절
+  FAILED        // 실패
 }

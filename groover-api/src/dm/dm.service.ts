@@ -81,8 +81,8 @@ export class DmService {
         lastMessageAt: { not: null }, // 메시지가 있는 스레드만
       },
       include: {
-        user1: { select: { id: true, name: true, profileImage: true } },
-        user2: { select: { id: true, name: true, profileImage: true } },
+        user1: { select: { id: true, name: true, profileImageUrl: true } },
+        user2: { select: { id: true, name: true, profileImageUrl: true } },
       },
       orderBy: { lastMessageAt: 'desc' },
       take: limit + 1,
@@ -109,8 +109,8 @@ export class DmService {
     const thread = await this.prisma.dmThread.findUnique({
       where: { id: threadId },
       include: {
-        user1: { select: { id: true, name: true, profileImage: true } },
-        user2: { select: { id: true, name: true, profileImage: true } },
+        user1: { select: { id: true, name: true, profileImageUrl: true } },
+        user2: { select: { id: true, name: true, profileImageUrl: true } },
       },
     });
 
@@ -175,7 +175,7 @@ export class DmService {
           metadata: dto.metadata || null,
         },
         include: {
-          sender: { select: { id: true, name: true, profileImage: true } },
+          sender: { select: { id: true, name: true, profileImageUrl: true } },
         },
       }),
       // 스레드 업데이트
@@ -220,7 +220,7 @@ export class DmService {
     const messages = await this.prisma.dmMessage.findMany({
       where: { threadId },
       include: {
-        sender: { select: { id: true, name: true, profileImage: true } },
+        sender: { select: { id: true, name: true, profileImageUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
@@ -342,7 +342,7 @@ export class DmService {
       partner: {
         id: partner.id,
         name: partner.name,
-        profileImage: partner.profileImage,
+        profileImageUrl: partner.profileImageUrl,
       },
       lastMessage: thread.lastMessage,
       lastMessageAt: thread.lastMessageAt,
