@@ -23,6 +23,7 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
+import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('blog')
 export class BlogController {
@@ -259,6 +260,33 @@ export class BlogController {
     return {
       success: true,
       data: drafts,
+    };
+  }
+
+  @Post('posts/:id/share')
+  @UseGuards(OptionalJwtAuthGuard)
+  async sharePost(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('platform') platform?: string,
+    @Request() req?: any,
+  ) {
+    const result = await this.blogService.sharePost(id, req?.user?.id, platform);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * 게시글 통계
+   * GET /v1/blog/posts/:id/stats
+   */
+  @Get('posts/:id/stats')
+  async getPostStats(@Param('id', ParseUUIDPipe) id: string) {
+    const stats = await this.blogService.getPostStats(id);
+    return {
+      success: true,
+      data: stats,
     };
   }
 }

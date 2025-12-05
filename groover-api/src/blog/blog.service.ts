@@ -657,4 +657,55 @@ export class BlogService {
       publishedAt: post.publishedAt,
     };
   }
+  async sharePost(postId: string, userId?: string, platform?: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.postShare.create({
+        data: {
+          postId,
+          userId: userId || null,
+          platform: platform || 'unknown',
+        },
+      }),
+      this.prisma.post.update({
+        where: { id: postId },
+        data: { shareCount: { increment: 1 } },
+      }),
+    ]);
+
+    return { message: '공유되었습니다' };
+  }
+
+  /**
+   * 게시글 통계
+   */
+  async getPostStats(postId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        viewCount: true,
+        likeCount: true,
+        shareCount: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다');
+    }
+
+    return {
+      postId: post.id,
+      views: post.viewCount,
+      likes: post.likeCount,
+      shares: post.shareCount,
+    };
+  }
 }

@@ -19,7 +19,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
  
 import { NotificationModule } from './notification/notification.module';
-
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -62,6 +62,7 @@ import { NotificationModule } from './notification/notification.module';
     DashboardModule,
     AdminModule,
     NotificationModule,
+    SearchModule,
   ],
   providers: [
     // 글로벌 Rate Limit Guard

@@ -34,7 +34,7 @@ model User {
   role Role @default(USER)
   statsCache      UserStatsCache?
   adminActions    AdminActionLog[] @relation("AdminActions")
-
+  googleId String? @unique
   
   carts           Cart[]
   recommendations Recommendation[]
@@ -67,6 +67,11 @@ model User {
   notifications  Notification[]
   pushTokens     PushToken[]
 
+  searchHistories SearchHistory[]
+
+  postShares PostShare[]
+  refreshTokens RefreshToken[]
+    
   
   @@map("users")
 }
@@ -333,6 +338,9 @@ model Post {
   // 관계
   products      PostProduct[]
   likes         PostLike[]
+
+  shareCount Int @default(0)
+  shares     PostShare[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -390,6 +398,7 @@ model PostLike {
   @@index([postId])
   @@index([userId])
 }
+
 // ==================== GROOVER CODE LOG ====================
 model GrooverCodeLog {
   id          String   @id @default(uuid())
@@ -1061,4 +1070,58 @@ model PushToken {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@index([userId])
+}
+
+// ============================================
+// 검색 히스토리 (새로 추가)
+// ============================================
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  type      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([query])
+}
+
+// ============================================
+// 인기 검색어 (새로 추가)
+// ============================================
+model PopularSearch {
+  id        String   @id @default(cuid())
+  query     String   @unique
+  count     Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@index([count(sort: Desc)])
+}
+
+model PostShare {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String?
+  platform  String?
+  createdAt DateTime @default(now())
+
+  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([expiresAt])
 }
