@@ -1,4 +1,6 @@
 // src/dm/dm.service.ts
+// 기존 코드에 직거래 방지 기능만 추가한 버전
+
 import {
   Injectable,
   Logger,
@@ -10,6 +12,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DmBlockService } from './services/dm-block.service';
 import { SendMessageDto, MessageType } from './dto';
 import * as sanitizeHtml from 'sanitize-html';
+
+// 🆕 직거래 방지 패턴
+const BLOCKED_PATTERNS: { pattern: RegExp; type: string }[] = [
+  { pattern: /\d{3,4}[-\s]?\d{2,4}[-\s]?\d{4,7}/g, type: 'BANK_ACCOUNT' },
+  { pattern: /01[0-9][-.\s]?\d{3,4}[-.\s]?\d{4}/g, type: 'PHONE_NUMBER' },
+  { pattern: /카[카톡오]\s*[:=]?\s*[a-zA-Z0-9_]{2,20}/gi, type: 'KAKAO_ID' },
+  { pattern: /오픈\s*채팅/gi, type: 'KAKAO_OPENCHAT' },
+  { pattern: /텔레그램\s*[:=]?\s*@?[a-zA-Z0-9_]{2,30}/gi, type: 'TELEGRAM' },
+  { pattern: /t\.me\/[a-zA-Z0-9_]+/gi, type: 'TELEGRAM_LINK' },
+  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, type: 'EMAIL' },
+  { pattern: /계좌\s*(번호|입금|송금)/gi, type: 'BANK_KEYWORD' },
+  { pattern: /직거래/gi, type: 'DIRECT_TRADE' },
+];
 
 @Injectable()
 export class DmService {
@@ -24,24 +39,16 @@ export class DmService {
   // 스레드 관리
   // ========================================
 
-  /**
-   * DM 스레드 시작/조회
-   * - 기존 스레드 있으면 반환
-   * - 없으면 새로 생성
-   */
   async startThread(userId: string, targetUserId: string) {
-    // 자기 자신에게 DM 불가
     if (userId === targetUserId) {
       throw new BadRequestException('자기 자신에게 메시지를 보낼 수 없습니다.');
     }
 
-    // 차단 여부 확인
     const isBlocked = await this.blockService.isBlocked(userId, targetUserId);
     if (isBlocked) {
       throw new ForbiddenException('차단된 사용자에게 메시지를 보낼 수 없습니다.');
     }
 
-    // 상대방 존재 확인
     const targetUser = await this.prisma.user.findUnique({
       where: { id: targetUserId },
     });
@@ -49,10 +56,8 @@ export class DmService {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
-    // user1Id < user2Id 로 정렬 (중복 방지)
     const [user1Id, user2Id] = [userId, targetUserId].sort();
 
-    // 기존 스레드 조회 또는 생성
     let thread = await this.prisma.dmThread.findUnique({
       where: {
         user1Id_user2Id: { user1Id, user2Id },
@@ -68,9 +73,6 @@ export class DmService {
     return this.formatThread(thread, userId);
   }
 
-  /**
-   * 내 DM 스레드 목록 조회
-   */
   async getThreads(userId: string, cursor?: string, limit: number = 20) {
     const threads = await this.prisma.dmThread.findMany({
       where: {
@@ -78,7 +80,7 @@ export class DmService {
           { user1Id: userId },
           { user2Id: userId },
         ],
-        lastMessageAt: { not: null }, // 메시지가 있는 스레드만
+        lastMessageAt: { not: null },
       },
       include: {
         user1: { select: { id: true, name: true, profileImageUrl: true } },
@@ -102,9 +104,6 @@ export class DmService {
     };
   }
 
-  /**
-   * 스레드 상세 조회
-   */
   async getThread(userId: string, threadId: string) {
     const thread = await this.prisma.dmThread.findUnique({
       where: { id: threadId },
@@ -118,7 +117,6 @@ export class DmService {
       throw new NotFoundException('대화를 찾을 수 없습니다.');
     }
 
-    // 참여자 확인
     if (thread.user1Id !== userId && thread.user2Id !== userId) {
       throw new ForbiddenException('접근 권한이 없습니다.');
     }
@@ -130,15 +128,11 @@ export class DmService {
   // 메시지 관리
   // ========================================
 
-  /**
-   * 메시지 전송
-   */
   async sendMessage(
     userId: string,
     threadId: string,
     dto: SendMessageDto,
   ) {
-    // 스레드 조회 및 권한 확인
     const thread = await this.prisma.dmThread.findUnique({
       where: { id: threadId },
     });
@@ -151,10 +145,8 @@ export class DmService {
       throw new ForbiddenException('접근 권한이 없습니다.');
     }
 
-    // 상대방 ID
     const targetUserId = thread.user1Id === userId ? thread.user2Id : thread.user1Id;
 
-    // 차단 여부 확인
     const isBlocked = await this.blockService.isBlocked(userId, targetUserId);
     if (isBlocked) {
       throw new ForbiddenException('차단된 사용자에게 메시지를 보낼 수 없습니다.');
@@ -163,9 +155,13 @@ export class DmService {
     // 메시지 정제 (XSS 방어)
     const sanitizedContent = this.sanitizeMessage(dto.content);
 
-    // 트랜잭션으로 메시지 저장 + 스레드 업데이트
+    // 🆕 직거래 방지 검사
+    const tradeCheck = await this.checkDirectTrade(userId, threadId, sanitizedContent);
+    if (!tradeCheck.allowed) {
+      throw new ForbiddenException(tradeCheck.message);
+    }
+
     const [message] = await this.prisma.$transaction([
-      // 메시지 생성
       this.prisma.dmMessage.create({
         data: {
           threadId,
@@ -178,13 +174,11 @@ export class DmService {
           sender: { select: { id: true, name: true, profileImageUrl: true } },
         },
       }),
-      // 스레드 업데이트
       this.prisma.dmThread.update({
         where: { id: threadId },
         data: {
           lastMessage: sanitizedContent.slice(0, 100),
           lastMessageAt: new Date(),
-          // 상대방 unread 카운트 증가
           ...(thread.user1Id === userId
             ? { unreadCountUser2: { increment: 1 } }
             : { unreadCountUser1: { increment: 1 } }),
@@ -195,16 +189,12 @@ export class DmService {
     return this.formatMessage(message);
   }
 
-  /**
-   * 메시지 목록 조회
-   */
   async getMessages(
     userId: string,
     threadId: string,
     cursor?: string,
     limit: number = 50,
   ) {
-    // 권한 확인
     const thread = await this.prisma.dmThread.findUnique({
       where: { id: threadId },
     });
@@ -233,21 +223,17 @@ export class DmService {
     const hasMore = messages.length > limit;
     const items = hasMore ? messages.slice(0, -1) : messages;
 
-    // 읽음 처리 (비동기)
     this.markAsRead(userId, threadId).catch(err =>
       this.logger.error('Failed to mark as read', err)
     );
 
     return {
-      items: items.map(msg => this.formatMessage(msg)).reverse(), // 오래된→최신 순
+      items: items.map(msg => this.formatMessage(msg)).reverse(),
       nextCursor: hasMore ? items[items.length - 1].id : null,
       hasMore,
     };
   }
 
-  /**
-   * 읽음 처리
-   */
   async markAsRead(userId: string, threadId: string) {
     const thread = await this.prisma.dmThread.findUnique({
       where: { id: threadId },
@@ -257,7 +243,6 @@ export class DmService {
     if (thread.user1Id !== userId && thread.user2Id !== userId) return;
 
     await this.prisma.$transaction([
-      // 메시지 읽음 처리
       this.prisma.dmMessage.updateMany({
         where: {
           threadId,
@@ -269,7 +254,6 @@ export class DmService {
           readAt: new Date(),
         },
       }),
-      // unread 카운트 초기화
       this.prisma.dmThread.update({
         where: { id: threadId },
         data: thread.user1Id === userId
@@ -281,9 +265,6 @@ export class DmService {
     return { success: true };
   }
 
-  /**
-   * 전체 안읽음 카운트
-   */
   async getUnreadCount(userId: string): Promise<number> {
     const threads = await this.prisma.dmThread.findMany({
       where: {
@@ -308,15 +289,91 @@ export class DmService {
   }
 
   // ========================================
-  // 헬퍼 메서드
+  // 🆕 직거래 방지
   // ========================================
 
   /**
-   * XSS 방어를 위한 메시지 정제
+   * 직거래 시도 검사
    */
+  private async checkDirectTrade(
+    userId: string,
+    threadId: string,
+    content: string,
+  ): Promise<{ allowed: boolean; message?: string }> {
+    const detectedTypes: string[] = [];
+
+    for (const { pattern, type } of BLOCKED_PATTERNS) {
+      const regex = new RegExp(pattern.source, pattern.flags);
+      if (regex.test(content)) {
+        detectedTypes.push(type);
+      }
+    }
+
+    if (detectedTypes.length === 0) {
+      return { allowed: true };
+    }
+
+    // 직거래 시도 로그 저장
+    try {
+      await this.prisma.directTradeAttempt.create({
+        data: {
+          userId,
+          threadId,
+          originalContent: content,
+          detectedPatterns: detectedTypes,
+          detectedTypes: detectedTypes,
+        },
+      });
+
+      // 경고 횟수 증가
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { warningCount: { increment: 1 } },
+      });
+
+      await this.prisma.userWarning.create({
+        data: {
+          userId,
+          type: 'DIRECT_TRADE_ATTEMPT',
+          reason: `직거래 시도: ${detectedTypes.join(', ')}`,
+        },
+      });
+
+      // 경고 3회 이상 → 광고 매칭 정지
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { warningCount: true },
+      });
+
+      if (user && user.warningCount >= 3) {
+        const suspendedUntil = new Date();
+        suspendedUntil.setDate(suspendedUntil.getDate() + 1);
+
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            adMatchingSuspended: true,
+            suspendedUntil,
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.error('직거래 로그 저장 실패:', error);
+    }
+
+    return {
+      allowed: false,
+      message: '안전결제 보호를 위해 외부 연락처 공유가 제한됩니다. 모든 광고비 결제는 Groover를 통해 진행해주세요.',
+    };
+  }
+
+  // ========================================
+  // 헬퍼 메서드
+  // ========================================
+
   private sanitizeMessage(content: string): string {
     return sanitizeHtml(content, {
-      allowedTags: [], // 모든 HTML 태그 제거
+      allowedTags: [],
       allowedAttributes: {},
     }).trim();
   }

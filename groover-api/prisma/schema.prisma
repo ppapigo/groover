@@ -10,6 +10,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  CREATOR
+  ADVERTISER
+  ADMIN
+  SUPER_ADMIN
+}
+
 // ==================== USER ====================
 model User {
   id              String    @id @default(uuid())
@@ -20,6 +28,13 @@ model User {
   preferences     Json?     // 사용자 선호도 (브랜드, 카테고리 등)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  warningCount        Int       @default(0)
+  adMatchingSuspended Boolean   @default(false)
+  suspendedUntil      DateTime?
+  role Role @default(USER)
+  statsCache      UserStatsCache?
+  adminActions    AdminActionLog[] @relation("AdminActions")
+
   
   carts           Cart[]
   recommendations Recommendation[]
@@ -42,6 +57,15 @@ model User {
   settlements          Settlement[]
   withdrawals          Withdrawal[]
 
+  eventLogs           EventLog[]
+  dailyStats          DailyStat[]
+  directTradeAttempts DirectTradeAttempt[]
+  warnings            UserWarning[]
+  advertiserDeals     AdDeal[] @relation("AdvertiserDeals")
+  creatorDeals        AdDeal[] @relation("CreatorDeals")
+ 
+  notifications  Notification[]
+  pushTokens     PushToken[]
 
   
   @@map("users")
@@ -688,6 +712,7 @@ enum TransactionType {
   WITHDRAWAL    // 출금
   REFUND        // 환불
   ADJUSTMENT    // 조정
+  AD_REWARD  
 }
 
 // 정산
@@ -758,4 +783,282 @@ enum WithdrawalStatus {
   COMPLETED     // 완료
   REJECTED      // 거절
   FAILED        // 실패
+}
+// ============================================
+// 직거래 방지 시스템
+// ============================================
+
+model DirectTradeAttempt {
+  id               String   @id @default(cuid())
+  userId           String
+  threadId         String?
+  originalContent  String   @db.Text
+  detectedPatterns Json
+  detectedTypes    Json
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model UserWarning {
+  id        String      @id @default(cuid())
+  userId    String
+  type      WarningType
+  reason    String
+  count     Int         @default(1)
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum WarningType {
+  DIRECT_TRADE_ATTEMPT
+  SPAM
+  ABUSE
+  SCAM
+  OTHER
+}
+
+// ============================================
+// 에스크로 시스템
+// ============================================
+
+enum AdDealStatus {
+  PROPOSED
+  ACCEPTED
+  PAID
+  SUBMITTED
+  CONFIRMED
+  SETTLED
+  REJECTED
+  CANCELLED
+  REFUNDED
+  EXPIRED
+}
+
+model AdDeal {
+  id              String        @id @default(cuid())
+  advertiserId    String
+  creatorId       String
+  conversationId  String?
+  title           String
+  description     String?       @db.Text
+  requirements    String?       @db.Text
+  totalAmount     Int
+  platformFee     Int
+  creatorAmount   Int
+  status          AdDealStatus  @default(PROPOSED)
+  escrowAmount    Int?
+  paymentId       String?
+  paidAt          DateTime?
+  submittedAt     DateTime?
+  submissionUrl   String?
+  submissionNote  String?
+  confirmedAt     DateTime?
+  settledAt       DateTime?
+  submitDeadline  DateTime?
+  confirmDeadline DateTime?
+  refundedAt      DateTime?
+  refundReason    String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  rejectedAt      DateTime?
+  rejectReason    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  advertiser User        @relation("AdvertiserDeals", fields: [advertiserId], references: [id])
+  creator    User        @relation("CreatorDeals", fields: [creatorId], references: [id])
+  escrowLogs EscrowLog[]
+
+  @@index([advertiserId])
+  @@index([creatorId])
+  @@index([status])
+}
+
+model EscrowLog {
+  id          String   @id @default(cuid())
+  dealId      String
+  action      String
+  fromStatus  String?
+  toStatus    String
+  amount      Int?
+  note        String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+
+  deal AdDeal @relation(fields: [dealId], references: [id])
+
+  @@index([dealId])
+}
+
+
+// 이벤트 로그 (모든 유저 활동 기록)
+model EventLog {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // search, view, cart_add, post_write, ad_impression, ad_click
+  targetId  String?  // productId, postId, adId 등
+  keyword   String?  // 검색어 (search 타입일 때)
+  metadata  Json?    // 추가 데이터
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@index([userId, type])
+  @@index([createdAt])
+}
+
+// 일별 통계 (집계 테이블)
+model DailyStat {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime @db.Date
+  pageViews     Int      @default(0)
+  postViews     Int      @default(0)  // 내 글 조회수
+  adImpressions Int      @default(0)
+  adClicks      Int      @default(0)
+  partnerClicks Int      @default(0)
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+}
+
+// ============================================
+// 2. 유저 통계 캐시 테이블 (기존 DailyStat 확장)
+// ============================================
+
+model UserStatsCache {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  
+  // 7일 통계 (캐시)
+  views7d         Int      @default(0)
+  clicks7d        Int      @default(0)
+  earnings7d      Int      @default(0)
+  
+  // 30일 통계 (캐시)
+  views30d        Int      @default(0)
+  clicks30d       Int      @default(0)
+  earnings30d     Int      @default(0)
+  
+  // 전체 통계 (캐시)
+  totalViews      Int      @default(0)
+  totalClicks     Int      @default(0)
+  totalEarnings   Int      @default(0)
+  
+  // 거래 통계
+  activeDeals     Int      @default(0)
+  completedDeals  Int      @default(0)
+  pendingProposals Int     @default(0)
+  
+  // 지갑 스냅샷
+  walletBalance   Int      @default(0)
+  pendingBalance  Int      @default(0)
+  
+  // 캐시 갱신 시간
+  updatedAt       DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([updatedAt])
+}
+
+// ============================================
+// 3. 관리자 액션 로그
+// ============================================
+
+model AdminActionLog {
+  id          String   @id @default(cuid())
+  
+  adminId     String
+  admin       User     @relation("AdminActions", fields: [adminId], references: [id])
+  
+  action      String   // suspend_user, unsuspend_user, warn_user, process_report, etc.
+  targetType  String?  // user, report, deal
+  targetId    String?
+  
+  // 변경 전/후 데이터
+  beforeData  Json?
+  afterData   Json?
+  
+  // 추가 정보
+  reason      String?
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([adminId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+// prisma/schema.prisma 맨 아래에 추가
+
+// ============================================
+// 알림 타입
+// ============================================
+enum NotificationType {
+  DEAL_PROPOSED
+  DEAL_ACCEPTED
+  DEAL_REJECTED
+  DEAL_PAID
+  DEAL_SUBMITTED
+  DEAL_CONFIRMED
+  DEAL_SETTLED
+  DEAL_DEADLINE
+  NEW_MESSAGE
+  SYSTEM_NOTICE
+  WARNING_RECEIVED
+  SUSPENSION_NOTICE
+  WITHDRAWAL_COMPLETE
+}
+
+// ============================================
+// 알림
+// ============================================
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  isPushed    Boolean          @default(false)
+  pushedAt    DateTime?
+  createdAt   DateTime         @default(now())
+  
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+// ============================================
+// 푸시 토큰
+// ============================================
+model PushToken {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  platform    String
+  deviceId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
 }

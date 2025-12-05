@@ -14,6 +14,13 @@ import { BlogModule } from './blog/blog.module';
 // import { UsersModule } from './users/users.module';
 // import { ProductsModule } from './products/products.module';
 
+import { EscrowModule } from './escrow/escrow.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { AdminModule } from './admin/admin.module';
+ 
+import { NotificationModule } from './notification/notification.module';
+
+
 @Module({
   imports: [
     // 환경변수
@@ -50,6 +57,11 @@ import { BlogModule } from './blog/blog.module';
     
     // Features
     BlogModule,
+
+    EscrowModule,
+    DashboardModule,
+    AdminModule,
+    NotificationModule,
   ],
   providers: [
     // 글로벌 Rate Limit Guard

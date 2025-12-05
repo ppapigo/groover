@@ -1,0 +1,57 @@
+// prisma/schema.prisma에 추가할 내용
+// 아래 내용을 기존 schema.prisma 파일 맨 아래에 추가하세요
+
+// ============================================
+// 직거래 방지 시스템
+// ============================================
+
+// 직거래 시도 로그
+model DirectTradeAttempt {
+  id               String   @id @default(cuid())
+  userId           String
+  threadId         String?
+  originalContent  String   @db.Text
+  detectedPatterns Json     // 감지된 패턴들
+  detectedTypes    Json     // 감지된 타입들 (BANK_ACCOUNT, PHONE_NUMBER 등)
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// 유저 경고 기록
+model UserWarning {
+  id        String      @id @default(cuid())
+  userId    String
+  type      WarningType
+  reason    String
+  count     Int         @default(1)  // 누적 경고 횟수
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum WarningType {
+  DIRECT_TRADE_ATTEMPT  // 직거래 시도
+  SPAM                  // 스팸
+  ABUSE                 // 욕설/혐오
+  SCAM                  // 사기
+  OTHER                 // 기타
+}
+
+// User 모델에 추가할 필드들
+// model User {
+//   ...기존 필드들...
+//   
+//   // 직거래 방지 관련
+//   warningCount      Int       @default(0)    // 총 경고 횟수
+//   adMatchingSuspended Boolean @default(false) // 광고 매칭 정지 여부
+//   suspendedUntil    DateTime?               // 정지 해제 일시
+//   
+//   directTradeAttempts DirectTradeAttempt[]
+//   warnings           UserWarning[]
+// }

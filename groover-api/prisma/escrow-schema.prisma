@@ -1,0 +1,109 @@
+// prisma/escrow-schema.prisma
+// 기존 schema.prisma에 추가할 내용
+
+// ============================================
+// 에스크로 시스템 (먹튀 방지)
+// ============================================
+
+// 광고 거래 상태
+enum AdDealStatus {
+  PROPOSED        // 제안됨
+  ACCEPTED        // 수락됨 (결제 대기)
+  PAID            // 결제완료 (에스크로 보관)
+  SUBMITTED       // 크리에이터 제출완료
+  CONFIRMED       // 광고주 확인완료
+  SETTLED         // 정산완료
+  REJECTED        // 광고주 거절
+  CANCELLED       // 취소됨
+  REFUNDED        // 환불됨
+  EXPIRED         // 기한만료 (자동환불)
+}
+
+// 광고 거래 (AdDeal) - 기존 모델 수정/교체
+model AdDeal {
+  id              String        @id @default(cuid())
+  
+  // 참여자
+  advertiserId    String        // 광고주
+  creatorId       String        // 크리에이터 (블로거)
+  conversationId  String?       // DM 대화방 ID
+  
+  // 광고 정보
+  title           String
+  description     String?       @db.Text
+  requirements    String?       @db.Text  // 광고 요구사항
+  
+  // 금액 정보
+  totalAmount     Int           // 총 광고비 (광고주 결제 금액)
+  platformFee     Int           // 플랫폼 수수료 (15%)
+  creatorAmount   Int           // 크리에이터 지급액 (85%)
+  
+  // 에스크로 상태
+  status          AdDealStatus  @default(PROPOSED)
+  escrowAmount    Int?          // 에스크로 보관 금액
+  
+  // 결제 정보
+  paymentId       String?       // 토스페이먼츠 결제 ID
+  paidAt          DateTime?     // 광고주 결제 시간
+  
+  // 제출 정보
+  submittedAt     DateTime?     // 크리에이터 제출 시간
+  submissionUrl   String?       // 제출 콘텐츠 URL (블로그 링크 등)
+  submissionNote  String?       // 제출 메모
+  
+  // 확인/정산 정보
+  confirmedAt     DateTime?     // 광고주 확인 시간
+  settledAt       DateTime?     // 정산 완료 시간
+  
+  // 기한 (자동 처리용)
+  submitDeadline  DateTime?     // 제출 기한 (결제 후 14일)
+  confirmDeadline DateTime?     // 확인 기한 (제출 후 72시간)
+  
+  // 환불/취소 정보
+  refundedAt      DateTime?
+  refundReason    String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  
+  // 거절 정보
+  rejectedAt      DateTime?
+  rejectReason    String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // 관계
+  advertiser      User          @relation("AdvertiserDeals", fields: [advertiserId], references: [id])
+  creator         User          @relation("CreatorDeals", fields: [creatorId], references: [id])
+  escrowLogs      EscrowLog[]
+  
+  @@index([advertiserId])
+  @@index([creatorId])
+  @@index([status])
+  @@index([submitDeadline])
+  @@index([confirmDeadline])
+}
+
+// 에스크로 로그 (상태 변경 이력)
+model EscrowLog {
+  id          String   @id @default(cuid())
+  dealId      String
+  action      String   // PAID, SUBMITTED, CONFIRMED, REFUNDED, AUTO_CONFIRMED, AUTO_REFUNDED 등
+  fromStatus  String?
+  toStatus    String
+  amount      Int?
+  note        String?
+  performedBy String?  // userId 또는 'SYSTEM'
+  createdAt   DateTime @default(now())
+  
+  deal        AdDeal   @relation(fields: [dealId], references: [id])
+  
+  @@index([dealId])
+}
+
+// User 모델에 추가할 관계 (기존 User 모델에 추가)
+// model User {
+//   ...
+//   advertiserDeals  AdDeal[] @relation("AdvertiserDeals")
+//   creatorDeals     AdDeal[] @relation("CreatorDeals")
+// }
