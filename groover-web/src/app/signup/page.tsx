@@ -1,454 +1,54 @@
 // src/app/signup/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-type Step = 'phone' | 'verify' | 'info' | 'complete';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignupPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('');
-  const [verifyCode, setVerifyCode] = useState('');
+  const { register } = useAuth();
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [timer, setTimer] = useState(0);
-  const [isVerified, setIsVerified] = useState(false);
 
-  // 타이머
-  useEffect(() => {
-    if (timer > 0) {
-      const interval = setInterval(() => setTimer((t) => t - 1), 1000);
-      return () => clearInterval(interval);
-    }
-  }, [timer]);
-
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/[^0-9]/g, '');
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  const isFormValid = 
+    isValidEmail(email) && 
+    name.trim().length > 0 && 
+    password.length >= 6 && 
+    password === passwordConfirm && 
+    agreeTerms;
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhone(e.target.value));
-  };
-
-  // 인증번호 전송
-  const handleSendCode = async () => {
-    if (phone.replace(/-/g, '').length !== 11) {
-      setError('올바른 전화번호를 입력해주세요.');
-      return;
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isFormValid) return;
 
     setIsLoading(true);
     setError('');
 
     try {
-      // TODO: API 호출 POST /auth/send-verification
-      const response = await fetch('/api/auth/send-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.replace(/-/g, '') }),
-      });
-
-      if (!response.ok) throw new Error('인증번호 전송에 실패했습니다.');
-
-      setStep('verify');
-      setTimer(180); // 3분
-    } catch (err) {
-      // Mock: 바로 다음 단계로
-      console.log('Mock: 인증번호 전송', phone);
-      setStep('verify');
-      setTimer(180);
+      await register(email, password, name);
+      router.push('/');
+    } catch (err: any) {
+      setError(err.response?.data?.message || '회원가입에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 인증번호 확인
-  const handleVerifyCode = async () => {
-    if (verifyCode.length !== 6) {
-      setError('6자리 인증번호를 입력해주세요.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      // TODO: API 호출 POST /auth/verify-code
-      const response = await fetch('/api/auth/verify-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: phone.replace(/-/g, ''),
-          code: verifyCode,
-        }),
-      });
-
-      if (!response.ok) throw new Error('인증번호가 일치하지 않습니다.');
-
-      setIsVerified(true);
-      setStep('info');
-    } catch (err) {
-      // Mock: 123456이면 성공
-      if (verifyCode === '123456') {
-        setIsVerified(true);
-        setStep('info');
-      } else {
-        setError('인증번호가 일치하지 않습니다. (테스트: 123456)');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 회원가입 완료
-  const handleSignup = async () => {
-    if (!name.trim()) {
-      setError('이름을 입력해주세요.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('비밀번호는 6자 이상이어야 합니다.');
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setError('비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      // TODO: API 호출 POST /auth/signup
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: phone.replace(/-/g, ''),
-          name,
-          password,
-        }),
-      });
-
-      if (!response.ok) throw new Error('회원가입에 실패했습니다.');
-
-      setStep('complete');
-    } catch (err) {
-      // Mock: 바로 완료
-      console.log('Mock: 회원가입', { phone, name, password });
-      setStep('complete');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 단계별 렌더링
-  const renderStep = () => {
-    switch (step) {
-      case 'phone':
-        return (
-          <>
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-              전화번호 인증
-            </h2>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '32px' }}>
-              본인 확인을 위해 전화번호를 입력해주세요.
-            </p>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  marginBottom: '8px',
-                }}
-              >
-                전화번호
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={handlePhoneChange}
-                placeholder="010-0000-0000"
-                maxLength={13}
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '10px',
-                  fontSize: '16px',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleSendCode}
-              disabled={isLoading || phone.replace(/-/g, '').length !== 11}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: phone.replace(/-/g, '').length === 11 ? '#0f62fe' : '#ccc',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: phone.replace(/-/g, '').length === 11 ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {isLoading ? '전송 중...' : '인증번호 받기'}
-            </button>
-          </>
-        );
-
-      case 'verify':
-        return (
-          <>
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-              인증번호 입력
-            </h2>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '32px' }}>
-              {phone}로 전송된 인증번호를 입력해주세요.
-            </p>
-
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '500' }}>
-                  인증번호
-                </label>
-                {timer > 0 && (
-                  <span style={{ fontSize: '13px', color: '#ef4444' }}>
-                    {formatTime(timer)}
-                  </span>
-                )}
-              </div>
-              <input
-                type="text"
-                value={verifyCode}
-                onChange={(e) => setVerifyCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                placeholder="6자리 숫자"
-                maxLength={6}
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '10px',
-                  fontSize: '20px',
-                  letterSpacing: '8px',
-                  textAlign: 'center',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleVerifyCode}
-              disabled={isLoading || verifyCode.length !== 6}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: verifyCode.length === 6 ? '#0f62fe' : '#ccc',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: verifyCode.length === 6 ? 'pointer' : 'not-allowed',
-                marginBottom: '12px',
-              }}
-            >
-              {isLoading ? '확인 중...' : '확인'}
-            </button>
-
-            <button
-              onClick={() => {
-                setTimer(180);
-                handleSendCode();
-              }}
-              disabled={timer > 0}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: 'transparent',
-                color: timer > 0 ? '#ccc' : '#0f62fe',
-                border: '1px solid',
-                borderColor: timer > 0 ? '#eee' : '#0f62fe',
-                borderRadius: '10px',
-                fontSize: '14px',
-                cursor: timer > 0 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              인증번호 재전송
-            </button>
-
-            <p style={{ marginTop: '16px', fontSize: '12px', color: '#999', textAlign: 'center' }}>
-              테스트 인증번호: 123456
-            </p>
-          </>
-        );
-
-      case 'info':
-        return (
-          <>
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-              회원 정보 입력
-            </h2>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '32px' }}>
-              사용하실 이름과 비밀번호를 입력해주세요.
-            </p>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', marginBottom: '8px' }}>
-                이름 (닉네임)
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="이름 또는 닉네임"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '10px',
-                  fontSize: '16px',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', marginBottom: '8px' }}>
-                비밀번호
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="6자 이상"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '10px',
-                  fontSize: '16px',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', marginBottom: '8px' }}>
-                비밀번호 확인
-              </label>
-              <input
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-                placeholder="비밀번호 재입력"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '1px solid #ddd',
-                  borderRadius: '10px',
-                  fontSize: '16px',
-                  outline: 'none',
-                }}
-              />
-              {passwordConfirm && password !== passwordConfirm && (
-                <p style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}>
-                  비밀번호가 일치하지 않습니다.
-                </p>
-              )}
-            </div>
-
-            {/* 약관 동의 */}
-            <div
-              style={{
-                padding: '14px',
-                background: '#f8f9fa',
-                borderRadius: '10px',
-                marginBottom: '24px',
-              }}
-            >
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input type="checkbox" defaultChecked style={{ marginTop: '2px' }} />
-                <span style={{ fontSize: '13px', color: '#666' }}>
-                  <Link href="/terms" style={{ color: '#0f62fe', textDecoration: 'underline' }}>이용약관</Link> 및{' '}
-                  <Link href="/privacy" style={{ color: '#0f62fe', textDecoration: 'underline' }}>개인정보처리방침</Link>에 동의합니다.
-                </span>
-              </label>
-            </div>
-
-            <button
-              onClick={handleSignup}
-              disabled={isLoading || !name || password.length < 6 || password !== passwordConfirm}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: name && password.length >= 6 && password === passwordConfirm ? '#0f62fe' : '#ccc',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: name && password.length >= 6 && password === passwordConfirm ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {isLoading ? '가입 중...' : '가입 완료'}
-            </button>
-          </>
-        );
-
-      case 'complete':
-        return (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <div style={{ fontSize: '60px', marginBottom: '16px' }}>🎉</div>
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
-              가입 완료!
-            </h2>
-            <p style={{ fontSize: '14px', color: '#666', marginBottom: '32px' }}>
-              Groover의 회원이 되신 것을 환영합니다.
-              <br />
-              지금 바로 쇼핑 리뷰를 시작해보세요!
-            </p>
-
-            <button
-              onClick={() => router.push('/login')}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: '#0f62fe',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              로그인하기
-            </button>
-          </div>
-        );
-    }
+  const handleGoogleLogin = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1';
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   return (
@@ -469,52 +69,37 @@ export default function SignupPage() {
           gap: '12px',
         }}
       >
-        {step !== 'complete' && (
-          <button
-            onClick={() => {
-              if (step === 'phone') router.push('/login');
-              else if (step === 'verify') setStep('phone');
-              else if (step === 'info') setStep('verify');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '20px',
-              cursor: 'pointer',
-            }}
-          >
-            ←
-          </button>
-        )}
+        <button
+          onClick={() => router.push('/login')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '20px',
+            cursor: 'pointer',
+          }}
+        >
+          ←
+        </button>
         <span style={{ fontSize: '16px', fontWeight: '600' }}>회원가입</span>
       </header>
 
-      {/* 진행률 */}
-      {step !== 'complete' && (
-        <div style={{ padding: '0 24px', marginBottom: '24px' }}>
-          <div
-            style={{
-              height: '4px',
-              background: '#eee',
-              borderRadius: '2px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                background: '#0f62fe',
-                borderRadius: '2px',
-                transition: 'width 0.3s',
-                width: step === 'phone' ? '33%' : step === 'verify' ? '66%' : '100%',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* 콘텐츠 */}
-      <div style={{ flex: 1, padding: '0 24px' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          flex: 1,
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>
+          Groover 가입하기
+        </h2>
+        <p style={{ fontSize: '14px', color: '#666', marginBottom: '32px' }}>
+          쇼핑 블로그 플랫폼에 오신 것을 환영합니다!
+        </p>
+
         {error && (
           <div
             style={{
@@ -530,12 +115,255 @@ export default function SignupPage() {
           </div>
         )}
 
-        {renderStep()}
-      </div>
+        {/* 이메일 */}
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              color: '#333',
+            }}
+          >
+            이메일
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="example@email.com"
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              border: '1px solid #ddd',
+              borderRadius: '10px',
+              fontSize: '16px',
+              outline: 'none',
+            }}
+          />
+          {email && !isValidEmail(email) && (
+            <p style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}>
+              올바른 이메일 형식을 입력해주세요.
+            </p>
+          )}
+        </div>
 
-      {/* 하단 로그인 링크 */}
-      {step === 'phone' && (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        {/* 이름 */}
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              color: '#333',
+            }}
+          >
+            이름 (닉네임)
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="이름 또는 닉네임"
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              border: '1px solid #ddd',
+              borderRadius: '10px',
+              fontSize: '16px',
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* 비밀번호 */}
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              color: '#333',
+            }}
+          >
+            비밀번호
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="6자 이상"
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              border: '1px solid #ddd',
+              borderRadius: '10px',
+              fontSize: '16px',
+              outline: 'none',
+            }}
+          />
+          {password && password.length < 6 && (
+            <p style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}>
+              비밀번호는 6자 이상이어야 합니다.
+            </p>
+          )}
+        </div>
+
+        {/* 비밀번호 확인 */}
+        <div style={{ marginBottom: '24px' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              marginBottom: '8px',
+              color: '#333',
+            }}
+          >
+            비밀번호 확인
+          </label>
+          <input
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            placeholder="비밀번호 재입력"
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              border: '1px solid #ddd',
+              borderRadius: '10px',
+              fontSize: '16px',
+              outline: 'none',
+            }}
+          />
+          {passwordConfirm && password !== passwordConfirm && (
+            <p style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}>
+              비밀번호가 일치하지 않습니다.
+            </p>
+          )}
+        </div>
+
+        {/* 약관 동의 */}
+        <div
+          style={{
+            padding: '14px',
+            background: '#f8f9fa',
+            borderRadius: '10px',
+            marginBottom: '24px',
+          }}
+        >
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              style={{ marginTop: '2px' }}
+            />
+            <span style={{ fontSize: '13px', color: '#666' }}>
+              <Link href="/terms" style={{ color: '#0f62fe', textDecoration: 'underline' }}>
+                이용약관
+              </Link>{' '}
+              및{' '}
+              <Link href="/privacy" style={{ color: '#0f62fe', textDecoration: 'underline' }}>
+                개인정보처리방침
+              </Link>
+              에 동의합니다.
+            </span>
+          </label>
+        </div>
+
+        {/* 가입 버튼 */}
+        <button
+          type="submit"
+          disabled={isLoading || !isFormValid}
+          style={{
+            width: '100%',
+            padding: '16px',
+            background: isFormValid ? '#0f62fe' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: isFormValid ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {isLoading ? '가입 중...' : '가입 완료'}
+        </button>
+
+        {/* 구분선 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            margin: '24px 0',
+          }}
+        >
+          <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+          <span style={{ fontSize: '12px', color: '#999' }}>또는</span>
+          <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+        </div>
+
+        {/* Google 가입 */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: '#fff',
+            color: '#333',
+            border: '1px solid #ddd',
+            borderRadius: '10px',
+            fontSize: '15px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
+          </svg>
+          Google로 계속하기
+        </button>
+
+        {/* 로그인 링크 */}
+        <div
+          style={{
+            marginTop: 'auto',
+            padding: '24px 0',
+            textAlign: 'center',
+          }}
+        >
           <span style={{ fontSize: '14px', color: '#666' }}>
             이미 계정이 있으신가요?{' '}
           </span>
@@ -551,7 +379,7 @@ export default function SignupPage() {
             로그인
           </Link>
         </div>
-      )}
+      </form>
     </div>
   );
 }
