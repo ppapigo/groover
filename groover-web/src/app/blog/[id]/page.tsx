@@ -1,427 +1,141 @@
-// src/app/blog/[id]/page.tsx
+// src/app/profile/[id]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
-import CommentSection from '@/components/blog/CommentSection';
-import { MockAdBanner } from '@/components/ad/AdBanner';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
+
+interface UserProfile {
+  id: string;
+  name: string;
+  profileImageUrl: string | null;
+  createdAt: string;
+  stats: {
+    postCount: number;
+    likeCount: number;
+    followerCount: number;
+    followingCount: number;
+  };
+}
 
 interface Post {
   id: string;
   title: string;
-  content: string;
+  excerpt: string;
   previewImage: string | null;
-  tags: string[];
   slug: string;
   viewCount: number;
   likeCount: number;
-  shareCount?: number;
-  isLiked?: boolean;
-  isOwner?: boolean;
-  author: {
-    id: string;
-    name: string;
-  };
-  publishedAt: string;
-  hasAffiliateLinks: boolean;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  image: string | null;
-  price: number | null;
-  source: string;
-  clickUrl: string;
-}
-
-export default function BlogDetailPage({ params }: { params: { id: string } }) {
+export default function UserProfilePage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [post, setPost] = useState<Post | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [showMenu, setShowMenu] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  const isMyProfile = user?.id === params.id;
 
   useEffect(() => {
-    fetchPost();
+    fetchProfile();
   }, [params.id]);
 
-  const fetchPost = async () => {
+  const fetchProfile = async () => {
     try {
-      const res = await api.get(`/blog/posts/${params.id}`);
-      const postData = res.data.data;
-      setPost(postData);
-      setIsLiked(postData.isLiked || false);
-      setLikeCount(postData.likeCount || 0);
-
-      // 상품 정보 가져오기
-      try {
-        const productsRes = await api.get(`/blog/posts/${postData.id}/products`);
-        setProducts(productsRes.data.data || []);
-      } catch (err) {
-        // 상품 없으면 무시
-      }
+      const res = await api.get(`/users/${params.id}`);
+      setProfile(res.data.data);
+      setIsFollowing(res.data.data.isFollowing || false);
+      
+      const postsRes = await api.get(`/users/${params.id}/posts`);
+      setPosts(postsRes.data.data.items || []);
     } catch (err) {
-      alert('글을 찾을 수 없습니다.');
-      router.back();
+      // Mock 데이터
+      setProfile({
+        id: params.id,
+        name: '사용자',
+        profileImageUrl: null,
+        createdAt: new Date().toISOString(),
+        stats: { postCount: 12, likeCount: 234, followerCount: 156, followingCount: 89 },
+      });
+      setPosts([
+        {
+          id: '1',
+          title: '육아템 총정리!',
+          excerpt: '첫째 키우면서 유용했던 육아템들',
+          previewImage: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=300',
+          slug: 'baby-items',
+          viewCount: 1520,
+          likeCount: 234,
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLike = async () => {
+  const handleFollow = async () => {
     if (!isAuthenticated) {
-      if (confirm('로그인이 필요합니다. 로그인하시겠습니까?')) {
-        router.push('/login');
-      }
+      if (confirm('로그인이 필요합니다.')) router.push('/login');
       return;
     }
-
     try {
-      const res = await api.post(`/blog/posts/${post?.id}/like`);
-      setIsLiked(res.data.data.liked);
-      setLikeCount(prev => res.data.data.liked ? prev + 1 : prev - 1);
-    } catch (err) {
-      alert('좋아요 처리에 실패했습니다.');
-    }
+      isFollowing ? await api.delete(`/users/${params.id}/follow`) : await api.post(`/users/${params.id}/follow`);
+    } catch {}
+    setIsFollowing(!isFollowing);
   };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    
-    // 공유 카운트 기록
-    try {
-      await api.post(`/blog/posts/${post?.id}/share?platform=link`);
-    } catch (err) {
-      // 무시
-    }
-
-    // Web Share API
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: post?.title,
-          url: url,
-        });
-      } catch (err) {
-        // 취소됨
-      }
-    } else {
-      // 클립보드 복사
-      await navigator.clipboard.writeText(url);
-      alert('링크가 복사되었습니다!');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-
-    try {
-      await api.delete(`/blog/posts/${post?.id}`);
-      alert('삭제되었습니다.');
-      router.push('/blog');
-    } catch (err) {
-      alert('삭제에 실패했습니다.');
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  if (isLoading) {
-    return (
-      <>
-        <AppHeader />
-        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-          로딩 중...
-        </div>
-      </>
-    );
-  }
-
-  if (!post) {
-    return (
-      <>
-        <AppHeader />
-        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-          글을 찾을 수 없습니다.
-        </div>
-      </>
-    );
-  }
+  if (isLoading) return <><AppHeader /><div style={{ padding: '40px', textAlign: 'center' }}>로딩 중...</div></>;
+  if (!profile) return <><AppHeader /><div style={{ padding: '40px', textAlign: 'center' }}>사용자를 찾을 수 없습니다.</div></>;
 
   return (
     <>
       <AppHeader />
-      <article>
-        {/* 이미지 */}
-        {post.previewImage && (
-          <div style={{ padding: '0 16px' }}>
-            <img
-              src={post.previewImage}
-              alt={post.title}
-              style={{
-                width: '100%',
-                height: '200px',
-                objectFit: 'cover',
-                borderRadius: '12px',
-                marginBottom: '16px',
-              }}
-            />
+      <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+        <div style={{ background: '#fff', padding: '24px 16px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+              {profile.profileImageUrl ? <img src={profile.profileImageUrl} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : '👤'}
+            </div>
+            <div>
+              <h1 style={{ fontSize: '20px', fontWeight: '700' }}>{profile.name}</h1>
+              <p style={{ fontSize: '13px', color: '#999' }}>{new Date(profile.createdAt).toLocaleDateString('ko-KR')} 가입</p>
+            </div>
           </div>
-        )}
 
-        <div style={{ padding: '0 16px' }}>
-          {/* 태그 */}
-          {post.tags && post.tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-              {post.tags.map((tag) => (
-                <Link
-                  key={tag}
-                  href={`/blog?tag=${tag}`}
-                  style={{
-                    fontSize: '12px',
-                    color: '#0f62fe',
-                    background: '#e8f0fe',
-                    padding: '4px 10px',
-                    borderRadius: '999px',
-                    textDecoration: 'none',
-                  }}
-                >
-                  #{tag}
-                </Link>
-              ))}
+          <div style={{ display: 'flex', justifyContent: 'space-around', padding: '16px 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '16px' }}>
+            <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700' }}>{profile.stats.postCount}</div><div style={{ fontSize: '12px', color: '#999' }}>게시글</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700' }}>{profile.stats.followerCount}</div><div style={{ fontSize: '12px', color: '#999' }}>팔로워</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700' }}>{profile.stats.followingCount}</div><div style={{ fontSize: '12px', color: '#999' }}>팔로잉</div></div>
+          </div>
+
+          {isMyProfile ? (
+            <Link href="/profile/edit" style={{ display: 'block', padding: '12px', background: '#f5f5f5', borderRadius: '10px', textAlign: 'center', textDecoration: 'none', color: '#333', fontWeight: '600' }}>프로필 수정</Link>
+          ) : (
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={handleFollow} style={{ flex: 1, padding: '12px', background: isFollowing ? '#f5f5f5' : '#0f62fe', color: isFollowing ? '#333' : '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}>{isFollowing ? '팔로잉' : '팔로우'}</button>
+              <button onClick={() => router.push(`/messages?user=${params.id}`)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}>메시지</button>
             </div>
           )}
+        </div>
 
-          {/* 제목 + 메뉴 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', flex: 1 }}>
-              {post.title}
-            </h1>
-            {post.isOwner && (
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                    padding: '4px',
-                  }}
-                >
-                  ⋮
-                </button>
-                {showMenu && (
-                  <div style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: '100%',
-                    background: '#fff',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    zIndex: 10,
-                  }}>
-                    <Link
-                      href={`/write?edit=${post.id}`}
-                      style={{
-                        display: 'block',
-                        padding: '12px 20px',
-                        fontSize: '14px',
-                        color: '#333',
-                        textDecoration: 'none',
-                        borderBottom: '1px solid #eee',
-                      }}
-                    >
-                      수정
-                    </Link>
-                    <button
-                      onClick={handleDelete}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '12px 20px',
-                        fontSize: '14px',
-                        color: '#ef4444',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                )}
+        <div style={{ padding: '16px' }}>
+          {posts.map(post => (
+            <Link key={post.id} href={`/blog/${post.slug || post.id}`} style={{ display: 'flex', background: '#fff', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px', textDecoration: 'none', color: 'inherit' }}>
+              {post.previewImage && <div style={{ width: '100px', height: '100px', background: `url(${post.previewImage}) center/cover` }} />}
+              <div style={{ padding: '12px', flex: 1 }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>{post.title}</h3>
+                <p style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>{post.excerpt}</p>
+                <div style={{ fontSize: '12px', color: '#999' }}>👁 {post.viewCount} ❤️ {post.likeCount}</div>
               </div>
-            )}
-          </div>
-
-          {/* 작성자 정보 */}
-          <div style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
-            <Link 
-              href={`/profile/${post.author.id}`}
-              style={{ color: '#333', fontWeight: '500', textDecoration: 'none' }}
-            >
-              {post.author.name}
             </Link>
-            {' · '}
-            {formatDate(post.publishedAt)}
-            {' · '}
-            조회 {post.viewCount}
-          </div>
-
-          {/* 본문 */}
-          <div
-            style={{
-              fontSize: '15px',
-              lineHeight: '1.8',
-              whiteSpace: 'pre-wrap',
-              marginBottom: '24px',
-            }}
-            dangerouslySetInnerHTML={{ __html: post.content }}
-          />
-
-          {/* 중간 광고 배너 */}
-          <MockAdBanner position="middle" />
-
-          {/* 관련 상품 */}
-          {products.length > 0 && (
-            <>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', marginTop: '24px' }}>
-                📦 관련 상품
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {products.map((product) => (
-                  <a
-                    key={product.id}
-                    href={product.clickUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px',
-                      background: '#f8f9fa',
-                      borderRadius: '10px',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {product.image && (
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '8px' }}
-                        />
-                      )}
-                      <div>
-                        <p style={{ fontSize: '14px', fontWeight: '500' }}>{product.name}</p>
-                        <p style={{ fontSize: '12px', color: '#666' }}>{product.source}</p>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      {product.price && (
-                        <p style={{ fontSize: '14px', fontWeight: '700' }}>
-                          {product.price.toLocaleString()}원
-                        </p>
-                      )}
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          marginTop: '4px',
-                          padding: '4px 12px',
-                          fontSize: '12px',
-                          background: '#0f62fe',
-                          color: '#fff',
-                          borderRadius: '6px',
-                        }}
-                      >
-                        구매
-                      </span>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* 하단 액션 */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '16px',
-              marginTop: '24px',
-              paddingTop: '16px',
-              borderTop: '1px solid #eee',
-            }}
-          >
-            <button
-              onClick={handleLike}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '8px 16px',
-                background: isLiked ? '#fee2e2' : 'transparent',
-                border: `1px solid ${isLiked ? '#ef4444' : '#ddd'}`,
-                borderRadius: '8px',
-                cursor: 'pointer',
-                color: isLiked ? '#ef4444' : 'inherit',
-              }}
-            >
-              {isLiked ? '❤️' : '🤍'} {likeCount}
-            </button>
-            <button
-              onClick={handleShare}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '8px 16px',
-                background: 'transparent',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              🔗 공유
-            </button>
-          </div>
-
-          {post.hasAffiliateLinks && (
-            <p style={{ marginTop: '16px', fontSize: '11px', color: '#999', textAlign: 'center' }}>
-              이 포스팅은 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 작성자가 제공받습니다.
-            </p>
-          )}
+          ))}
         </div>
-
-        {/* 하단 광고 배너 */}
-        <div style={{ padding: '0 16px 16px' }}>
-          <MockAdBanner position="bottom" />
-        </div>
-
-        {/* 댓글 섹션 */}
-        <CommentSection postId={post.id} />
-      </article>
+      </div>
     </>
   );
 }
