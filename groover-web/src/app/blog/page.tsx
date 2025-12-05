@@ -78,7 +78,34 @@ export default function BlogPage() {
     <>
       <AppHeader />
       <div className="blog-page">
-        <h2>오늘의 쇼핑 리뷰</h2>
+        {/* 헤더 + 글쓰기 버튼 */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
+          <h2 style={{ margin: 0 }}>오늘의 쇼핑 리뷰</h2>
+          <Link 
+            href="/write" 
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: '#0f62fe',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+              textDecoration: 'none',
+              fontWeight: '300',
+              lineHeight: 1,
+            }}
+          >
+            +
+          </Link>
+        </div>
 
         {/* 상단 광고 배너 */}
         <MockAdBanner position="top" />
