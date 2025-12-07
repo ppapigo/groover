@@ -11,43 +11,35 @@ import { AuthModule } from './auth/auth.module';
 
 // Feature Modules
 import { BlogModule } from './blog/blog.module';
-// import { UsersModule } from './users/users.module';
-// import { ProductsModule } from './products/products.module';
-
+import { DmModule } from './dm/dm.module';
 import { EscrowModule } from './escrow/escrow.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
- 
 import { NotificationModule } from './notification/notification.module';
 import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
-    // 환경변수
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
-    
-    // 스케줄러 (상품 캐시 갱신 등)
     ScheduleModule.forRoot(),
-    
-    // Rate Limiting
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 1000,   // 1초
-        limit: 3,    // 3회
+        ttl: 1000,
+        limit: 3,
       },
       {
         name: 'medium',
-        ttl: 10000,  // 10초
-        limit: 20,   // 20회
+        ttl: 10000,
+        limit: 20,
       },
       {
         name: 'long',
-        ttl: 60000,  // 1분
-        limit: 100,  // 100회
+        ttl: 60000,
+        limit: 100,
       },
     ]),
     
@@ -57,7 +49,7 @@ import { SearchModule } from './search/search.module';
     
     // Features
     BlogModule,
-
+    DmModule,
     EscrowModule,
     DashboardModule,
     AdminModule,
@@ -65,7 +57,6 @@ import { SearchModule } from './search/search.module';
     SearchModule,
   ],
   providers: [
-    // 글로벌 Rate Limit Guard
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

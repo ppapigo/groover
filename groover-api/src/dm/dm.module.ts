@@ -1,5 +1,7 @@
 // src/dm/dm.module.ts
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DmController } from './dm.controller';
 import { DmService } from './dm.service';
 import { DmGateway } from './dm.gateway';
@@ -17,6 +19,15 @@ import { HttpModule } from '@nestjs/axios';
       timeout: 5000,
       maxRedirects: 3,
     }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET'),
+        signOptions: { expiresIn: '15m' },
+      }),
+      inject: [ConfigService],
+    }),
+    ConfigModule,
   ],
   controllers: [DmController],
   providers: [
