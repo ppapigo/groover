@@ -5,6 +5,7 @@ import Script from 'next/script';
 import './globals.css';
 import BottomTabBar from '@/components/layout/BottomTabBar';
 import { Providers } from '@/lib/providers';
+import { FcmInitializer } from '@/components/FcmInitializer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -30,13 +31,14 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-         <Providers>
-        <div className="app-root">
-          <main className="app-main">
-            {children}
-          </main>
-          <BottomTabBar />
-        </div>
+        <Providers>
+          <FcmInitializer />
+          <div className="app-root">
+            <main className="app-main">
+              {children}
+            </main>
+            <BottomTabBar />
+          </div>
         </Providers>
       </body>
     </html>
