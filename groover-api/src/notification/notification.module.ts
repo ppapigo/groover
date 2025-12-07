@@ -6,20 +6,24 @@ import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { NotificationQueueService } from './notification.queue';
 import { NotificationSseService } from './notification.sse';
+import { FcmService } from './fcm.service';
+import { FcmController } from './fcm.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
-  controllers: [NotificationController],
+  controllers: [NotificationController, FcmController],
   providers: [
     NotificationService,
     NotificationQueueService,
     NotificationSseService,
+    FcmService,
   ],
   exports: [
     NotificationService,
     NotificationQueueService,
     NotificationSseService,
+    FcmService,
   ],
 })
 export class NotificationModule {}

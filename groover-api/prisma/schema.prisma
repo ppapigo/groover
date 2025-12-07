@@ -72,6 +72,7 @@ model User {
   postShares PostShare[]
   refreshTokens RefreshToken[]
     
+  fcmTokens FcmToken[]
   
   @@map("users")
 }
@@ -1124,4 +1125,17 @@ model RefreshToken {
   
   @@index([userId])
   @@index([expiresAt])
+}
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String
+  device    String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
 }
