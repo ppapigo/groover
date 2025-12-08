@@ -1,78 +1,33 @@
 // src/app/blog/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
 import { MockAdBanner } from '@/components/ad/AdBanner';
-
-interface Post {
-  id: string;
-  title: string;
-  desc: string;
-  date: string;
-  author: string;
-  tags: string[];
-  imageUrl: string;
-  likes: number;
-  views: number;
-}
-
-const posts: Post[] = [
-  {
-    id: '1',
-    title: '육아템 총정리! 신생아부터 돌까지 필수 아이템 20가지',
-    desc: '첫째 키우면서 진짜 유용했던 육아템들만 정리했어요. 쓸데없는 거 사지 마시고 이것만 사세요!',
-    date: '2024. 12. 01.',
-    author: '육아맘',
-    tags: ['육아', '신생아'],
-    imageUrl: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=300',
-    likes: 234,
-    views: 1520,
-  },
-  {
-    id: '2',
-    title: '겨울 캠핑 장바구니 - 따뜻하게 캠핑하기',
-    desc: '추운 겨울에도 캠핑 가능! 난방 텐트부터 핫팩까지 완벽 준비 리스트',
-    date: '2024. 11. 28.',
-    author: '캠핑러버',
-    tags: ['캠핑', '겨울'],
-    imageUrl: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=300',
-    likes: 89,
-    views: 456,
-  },
-  {
-    id: '3',
-    title: '다이슨 에어랩 vs 샤오미 드라이기 솔직 비교 후기',
-    desc: '비싼 게 다가 아니더라고요. 6개월 사용 후 솔직한 비교 리뷰입니다.',
-    date: '2024. 11. 25.',
-    author: '뷰티덕후',
-    tags: ['뷰티', '가전'],
-    imageUrl: 'https://images.unsplash.com/photo-1522338242042-2d1c2985df9f?w=300',
-    likes: 567,
-    views: 3240,
-  },
-  {
-    id: '4',
-    title: '자취 필수템 추천! 원룸 살림 시작하는 분들 필독',
-    desc: '처음 자취 시작할 때 이거 없으면 진짜 불편해요. 가성비 좋은 것들만 모았습니다.',
-    date: '2024. 11. 20.',
-    author: '자취9년차',
-    tags: ['자취', '살림'],
-    imageUrl: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=300',
-    likes: 892,
-    views: 5670,
-  },
-];
+import { useFeed } from '@/hooks/useFeed';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 const categories = ['전체', '육아', '뷰티', '가전', '캠핑', '자취', '패션'];
 
 export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('전체');
+  
+  const feedType = activeCategory === '전체' ? 'latest' : 'tag';
+  const tag = activeCategory === '전체' ? undefined : activeCategory;
+  
+  const { posts, isLoading, hasMore, error, loadMore, fetchPosts } = useFeed(feedType, tag);
+  
+  const { targetRef } = useInfiniteScroll({
+    onLoadMore: loadMore,
+    hasMore,
+    isLoading,
+  });
 
-  const filteredPosts = activeCategory === '전체'
-    ? posts
-    : posts.filter((p) => p.tags.some((t) => t.includes(activeCategory)));
+  // 초기 로드 및 카테고리 변경 시
+  useEffect(() => {
+    fetchPosts(null);
+  }, [activeCategory]);
 
   return (
     <>
@@ -123,26 +78,36 @@ export default function BlogPage() {
           ))}
         </div>
 
+        {/* 에러 표시 */}
+        {error && (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#e53e3e' }}>
+            {error}
+          </div>
+        )}
+
         {/* 포스트 리스트 */}
         <div className="post-list">
-          {filteredPosts.map((post, index) => (
+          {posts.map((post, index) => (
             <div key={post.id}>
               <Link href={`/blog/${post.id}`} className="post-card">
                 <img
                   className="post-thumb"
-                  src={post.imageUrl}
+                  src={post.thumbnail || 'https://via.placeholder.com/300x200?text=No+Image'}
                   alt={post.title}
                 />
                 <div className="post-meta">
                   <h3>{post.title}</h3>
-                  <p>{post.desc}</p>
+                  <p>{post.excerpt}</p>
                   <div className="post-footer">
                     <div className="post-tags">
-                      {post.tags.map((tag) => (
+                      {post.tags?.map((tag) => (
                         <span key={tag} className="post-tag">#{tag}</span>
                       ))}
                     </div>
-                    <span>{post.author} · {post.date}</span>
+                    <span>{post.author?.name} · {new Date(post.publishedAt).toLocaleDateString('ko-KR')}</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                    👁 {post.viewCount} · ❤️ {post.likeCount}
                   </div>
                 </div>
               </Link>
@@ -151,6 +116,30 @@ export default function BlogPage() {
               {index === 1 && <MockAdBanner position="middle" />}
             </div>
           ))}
+
+          {/* 로딩 표시 */}
+          {isLoading && (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+              로딩 중...
+            </div>
+          )}
+
+          {/* 더 이상 없음 표시 */}
+          {!hasMore && posts.length > 0 && (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+              모든 글을 불러왔습니다
+            </div>
+          )}
+
+          {/* 글 없음 표시 */}
+          {!isLoading && posts.length === 0 && (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+              아직 글이 없습니다. 첫 번째 글을 작성해보세요!
+            </div>
+          )}
+
+          {/* 무한스크롤 감지 영역 */}
+          <div ref={targetRef} style={{ height: '20px' }} />
         </div>
       </div>
     </>
