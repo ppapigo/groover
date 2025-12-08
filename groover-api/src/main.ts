@@ -6,11 +6,12 @@ import { join } from 'path';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
-import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: true,
+  });
 
   // 보안 헤더
   app.use(helmet({
@@ -19,8 +20,8 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Body 크기 제한 증가
-  app.use(bodyParser.json({ limit: '20mb' }));
-  app.use(bodyParser.urlencoded({ limit: '20mb', extended: true }));
+  app.useBodyParser('json', { limit: '20mb' });
+  app.useBodyParser('urlencoded', { limit: '20mb', extended: true });
 
   // API 버전 프리픽스
   app.setGlobalPrefix('v1');
@@ -37,7 +38,7 @@ async function bootstrap() {
     }),
   );
 
- // CORS 설정
+  // CORS 설정
   app.enableCors({
     origin: [
       'http://localhost:3000',
