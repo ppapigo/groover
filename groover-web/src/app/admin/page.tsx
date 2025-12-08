@@ -157,32 +157,32 @@ function StatsTab() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">총 거래액</p>
-            <p className="text-xl font-bold">{formatCurrency(stats?.totalTransactionVolume || 0)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.data?.totalTransactionVolume || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">총 수수료</p>
-            <p className="text-xl font-bold text-green-600">{formatCurrency(stats?.totalPlatformFees || 0)}</p>
+            <p className="text-xl font-bold text-green-600">{formatCurrency(stats?.data?.totalPlatformFees || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">이번 달 수수료</p>
-            <p className="text-xl font-bold">{formatCurrency(stats?.monthlyPlatformFees || 0)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.data?.monthlyPlatformFees || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">완료 거래</p>
-            <p className="text-xl font-bold">{stats?.completedDeals || 0}건</p>
+            <p className="text-xl font-bold">{stats?.data?.completedDeals || 0}건</p>
           </div>
         </div>
       </div>
 
       {/* 경고 */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`bg-white rounded-xl p-5 ${(stats?.pendingReports || 0) > 0 ? 'ring-2 ring-red-400' : ''}`}>
+        <div className={`bg-white rounded-xl p-5 ${(stats?.data?.pendingReports || 0) > 0 ? 'ring-2 ring-red-400' : ''}`}>
           <p className="text-sm text-gray-500">대기 중인 신고</p>
-          <p className="text-2xl font-bold text-red-600">{stats?.pendingReports || 0}</p>
+          <p className="text-2xl font-bold text-red-600">{stats?.data?.pendingReports || 0}</p>
         </div>
         <div className="bg-white rounded-xl p-5">
           <p className="text-sm text-gray-500">직거래 시도 (이번 달)</p>
-          <p className="text-2xl font-bold text-orange-600">{stats?.directTradeAttempts || 0}</p>
+          <p className="text-2xl font-bold text-orange-600">{stats?.data?.directTradeAttempts || 0}</p>
         </div>
       </div>
     </div>
