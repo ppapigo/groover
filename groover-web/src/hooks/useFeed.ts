@@ -56,8 +56,8 @@ export function useFeed(options: UseFeedOptions = {}) {
       if (category && category !== '전체') params.append('category', category);
       if (tag) params.append('tag', tag);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/v1/blog/feed?${params}`,
+     const response = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/feed?${params}`,
         {
           headers: {
             'Content-Type': 'application/json',
