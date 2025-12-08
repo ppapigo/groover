@@ -69,7 +69,8 @@ export function useFeed(options: UseFeedOptions = {}) {
         throw new Error('피드를 불러오는데 실패했습니다.');
       }
 
-      const data: FeedResponse = await response.json();
+      const result = await response.json();
+      const data: FeedResponse = result.data;  // data.data에서 꺼내기
 
       if (cursor) {
         setPosts(prev => [...prev, ...data.posts]);
