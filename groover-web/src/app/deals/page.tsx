@@ -93,21 +93,21 @@ export default function DealsPage() {
           </div>
         )}
 
-        {!isLoading && data?.items.length === 0 && (
+        {!isLoading && data?.data?.items.length === 0 && (
           <div className="text-center py-12">
             <p className="text-4xl mb-3">📭</p>
             <p className="text-gray-500">거래가 없습니다</p>
           </div>
         )}
 
-        {!isLoading && data && data.items.length > 0 && (
+        {!isLoading && data && data?.data?.items.length > 0 && (
           <div className="space-y-3">
-            {data.items.map((deal) => (
+            {data?.data?.items.map((deal) => (
               <DealCard key={deal.id} deal={deal} role={role} />
             ))}
 
             {/* 페이지네이션 */}
-            {data.totalPages > 1 && (
+            {data?.data?.totalPages > 1 && (
               <div className="flex justify-center gap-2 mt-4">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -117,11 +117,11 @@ export default function DealsPage() {
                   이전
                 </button>
                 <span className="px-4 py-2 text-gray-600">
-                  {page} / {data.totalPages}
+                  {page} / {data?.data?.totalPages}
                 </span>
                 <button
-                  onClick={() => setPage(p => Math.min(data.totalPages, p + 1))}
-                  disabled={page === data.totalPages}
+                  onClick={() => setPage(p => Math.min(data?.data?.totalPages, p + 1))}
+                  disabled={page === data?.data?.totalPages}
                   className="px-4 py-2 rounded-lg bg-white text-gray-600 disabled:opacity-50"
                 >
                   다음

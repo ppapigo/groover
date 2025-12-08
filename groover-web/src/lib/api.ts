@@ -122,4 +122,19 @@ api.interceptors.response.use(
   }
 );
 
+// Dashboard API
+export const dashboardApi = {
+  getCreatorDashboard: () => api.get('/dashboard/creator'),
+  getAdvertiserDashboard: () => api.get('/dashboard/advertiser'),
+  getStats: () => api.get('/dashboard/stats'),
+  getEarnings: (period?: string | number) => api.get('/dashboard/earnings', { params: { period } }),
+  getActivity: (limit?: number) => api.get('/dashboard/activity', { params: { limit } }),
+  getCreatorStats: () => api.get('/dashboard/creator'),
+  getAdvertiserStats: () => api.get('/dashboard/advertiser'),
+  getStatsRange: (startDate?: string | number, endDate?: string | number) => api.get('/dashboard/stats', { params: { startDate, endDate } }),
+  getEarningsRange: (startDate?: string | number, endDate?: string | number) => api.get('/dashboard/earnings', { params: { startDate, endDate } }),
+  getRecentActivity: (limit?: number) => api.get('/dashboard/activity', { params: { limit } }),
+};
+
+
 export default api;
