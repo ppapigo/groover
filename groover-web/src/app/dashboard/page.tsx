@@ -108,7 +108,7 @@ function CreatorDashboard() {
           <p className="text-gray-400 text-center py-4">활동이 없습니다</p>
         ) : (
           <div className="space-y-3">
-            {activities?.slice(0, 5).map((activity) => (
+            {activities?.slice(0, 5).map((activity: any) => (
               <div key={activity.id} className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
@@ -178,7 +178,7 @@ function AdvertiserDashboard() {
           <p className="text-gray-400 text-center py-4">활동이 없습니다</p>
         ) : (
           <div className="space-y-3">
-            {activities?.slice(0, 5).map((activity) => (
+           {activities?.slice(0, 5).map((activity: any) => (
               <div key={activity.id} className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
