@@ -67,8 +67,8 @@ function CreatorDashboard() {
       {/* 잔액 카드 */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-5 text-white">
         <p className="text-sm opacity-80">출금 가능 잔액</p>
-        <p className="text-3xl font-bold mt-1">{formatCurrency(stats?.availableBalance || 0)}</p>
-        <p className="text-sm opacity-80 mt-2">대기 중: {formatCurrency(stats?.pendingBalance || 0)}</p>
+        <p className="text-3xl font-bold mt-1">{formatCurrency(stats?.data?.availableBalance || 0)}</p>
+        <p className="text-sm opacity-80 mt-2">대기 중: {formatCurrency(stats?.data?.pendingBalance || 0)}</p>
         <button className="mt-4 px-4 py-2 bg-white/20 rounded-lg text-sm font-medium">
           출금하기
         </button>
@@ -76,10 +76,10 @@ function CreatorDashboard() {
 
       {/* 통계 그리드 */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard title="7일 조회수" value={stats?.views7d || 0} />
-        <StatCard title="7일 클릭수" value={stats?.clicks7d || 0} />
-        <StatCard title="7일 수익" value={stats?.earnings7d || 0} type="currency" />
-        <StatCard title="총 수익" value={stats?.totalEarnings || 0} type="currency" />
+        <StatCard title="7일 조회수" value={stats?.data?.views7d || 0} />
+        <StatCard title="7일 클릭수" value={stats?.data?.clicks7d || 0} />
+        <StatCard title="7일 수익" value={stats?.data?.earnings7d || 0} type="currency" />
+        <StatCard title="총 수익" value={stats?.data?.totalEarnings || 0} type="currency" />
       </div>
 
       {/* 거래 현황 */}
@@ -87,15 +87,15 @@ function CreatorDashboard() {
         <h3 className="font-semibold text-gray-900 mb-3">거래 현황</h3>
         <div className="flex justify-between text-center">
           <div>
-            <p className="text-2xl font-bold text-blue-600">{stats?.pendingProposals || 0}</p>
+            <p className="text-2xl font-bold text-blue-600">{stats?.data?.pendingProposals || 0}</p>
             <p className="text-xs text-gray-500">대기 중</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-purple-600">{stats?.activeDeals || 0}</p>
+            <p className="text-2xl font-bold text-purple-600">{stats?.data?.activeDeals || 0}</p>
             <p className="text-xs text-gray-500">진행 중</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-green-600">{stats?.completedDeals || 0}</p>
+            <p className="text-2xl font-bold text-green-600">{stats?.data?.completedDeals || 0}</p>
             <p className="text-xs text-gray-500">완료</p>
           </div>
         </div>
@@ -104,11 +104,11 @@ function CreatorDashboard() {
       {/* 최근 활동 */}
       <div className="bg-white rounded-xl p-4">
         <h3 className="font-semibold text-gray-900 mb-3">최근 활동</h3>
-        {activities?.length === 0 ? (
+        {activities?.data?.length === 0 ? (
           <p className="text-gray-400 text-center py-4">활동이 없습니다</p>
         ) : (
           <div className="space-y-3">
-            {activities?.slice(0, 5).map((activity: any) => (
+            {activities?.data?.slice(0, 5).map((activity: any) => (
               <div key={activity.id} className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
@@ -143,8 +143,8 @@ function AdvertiserDashboard() {
       {/* 지출 카드 */}
       <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-5 text-white">
         <p className="text-sm opacity-80">총 광고 지출</p>
-        <p className="text-3xl font-bold mt-1">{formatCurrency(stats?.totalSpent || 0)}</p>
-        <p className="text-sm opacity-80 mt-2">이번 달: {formatCurrency(stats?.monthlySpent || 0)}</p>
+        <p className="text-3xl font-bold mt-1">{formatCurrency(stats?.data?.totalSpent || 0)}</p>
+        <p className="text-sm opacity-80 mt-2">이번 달: {formatCurrency(stats?.data?.monthlySpent || 0)}</p>
         <Link href="/deals/new" className="inline-block mt-4 px-4 py-2 bg-white/20 rounded-lg text-sm font-medium">
           새 광고 만들기
         </Link>
@@ -152,17 +152,17 @@ function AdvertiserDashboard() {
 
       {/* 통계 그리드 */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard title="진행 중" value={stats?.activeDeals || 0} />
-        <StatCard title="완료" value={stats?.completedDeals || 0} />
-        <StatCard title="대기 중 제안" value={stats?.pendingProposals || 0} />
-        <StatCard title="확인 필요" value={stats?.pendingConfirmation || 0} highlight={stats?.pendingConfirmation > 0} />
+        <StatCard title="진행 중" value={stats?.data?.activeDeals || 0} />
+        <StatCard title="완료" value={stats?.data?.completedDeals || 0} />
+        <StatCard title="대기 중 제안" value={stats?.data?.pendingProposals || 0} />
+        <StatCard title="확인 필요" value={stats?.data?.pendingConfirmation || 0} highlight={stats?.data?.pendingConfirmation > 0} />
       </div>
 
       {/* 확인 필요 알림 */}
-      {stats?.pendingConfirmation > 0 && (
+      {stats?.data?.pendingConfirmation > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
           <p className="font-medium text-orange-800">
-            ⚠️ {stats.pendingConfirmation}개의 콘텐츠가 확인을 기다리고 있습니다
+            ⚠️ {stats?.data?.pendingConfirmation}개의 콘텐츠가 확인을 기다리고 있습니다
           </p>
           <p className="text-sm text-orange-600 mt-1">72시간 내 미확인시 자동 승인</p>
           <Link href="/deals?status=SUBMITTED" className="text-sm text-orange-700 font-medium mt-2 inline-block">
@@ -174,11 +174,11 @@ function AdvertiserDashboard() {
       {/* 최근 활동 */}
       <div className="bg-white rounded-xl p-4">
         <h3 className="font-semibold text-gray-900 mb-3">최근 활동</h3>
-        {activities?.length === 0 ? (
+        {activities?.data?.length === 0 ? (
           <p className="text-gray-400 text-center py-4">활동이 없습니다</p>
         ) : (
           <div className="space-y-3">
-           {activities?.slice(0, 5).map((activity: any) => (
+           {activities?.data?.slice(0, 5).map((activity: any) => (
               <div key={activity.id} className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
