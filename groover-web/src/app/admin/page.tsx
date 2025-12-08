@@ -145,10 +145,10 @@ function StatsTab() {
     <div className="space-y-6">
       {/* 주요 지표 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="총 유저" value={stats?.totalUsers || 0} />
-        <StatCard label="이번 달 신규" value={stats?.newUsersThisMonth || 0} color="blue" />
-        <StatCard label="총 거래" value={stats?.totalDeals || 0} />
-        <StatCard label="진행 중" value={stats?.activeDeals || 0} color="purple" />
+       <StatCard label="총 유저" value={stats?.data?.totalUsers || 0} />
+        <StatCard label="이번 달 신규" value={stats?.data?.newUsersThisMonth || 0} color="blue" />
+          <StatCard label="총 거래" value={stats?.data?.totalDeals || 0} />
+        <StatCard label="진행 중" value={stats?.data?.activeDeals || 0} color="purple" />
       </div>
 
       {/* 수익 */}
