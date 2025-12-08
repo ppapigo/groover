@@ -9,7 +9,7 @@ export function useNotifications() {
   return useInfiniteQuery({
     queryKey: ['notifications'],
     queryFn: ({ pageParam }) => notificationApi.getNotifications(pageParam),
-    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
+    getNextPageParam: (lastPage) => lastPage.data?.hasMore ? lastPage.data?.nextCursor : undefined,
     initialPageParam: undefined as string | undefined,
   });
 }
