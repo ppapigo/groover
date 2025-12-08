@@ -25,7 +25,7 @@ interface Post {
 }
 
 interface FeedResponse {
-  posts: Post[];
+  items: Post[];
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -73,9 +73,9 @@ export function useFeed(options: UseFeedOptions = {}) {
       const data: FeedResponse = result.data;  // data.data에서 꺼내기
 
       if (cursor) {
-        setPosts(prev => [...prev, ...data.posts]);
+        setPosts(prev => [...prev, ...data.items]);
       } else {
-        setPosts(data.posts);
+        setPosts(data.items);
       }
       
       setNextCursor(data.nextCursor);
