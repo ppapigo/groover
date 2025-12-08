@@ -49,25 +49,25 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
     );
   }
 
-  const otherParty = role === 'creator' ? deal.advertiser : deal.creator;
-  const amount = role === 'creator' ? deal.creatorAmount : deal.totalAmount;
+  const otherParty = role === 'creator' ? deal?.data?.advertiser : deal?.data?.creator;
+  const amount = role === 'creator' ? deal?.data?.creatorAmount : deal?.data?.totalAmount;
 
   const handleAccept = async () => {
     if (confirm('제안을 수락하시겠습니까?')) {
-      await acceptMutation.mutateAsync(deal.id);
+      await acceptMutation.mutateAsync(deal?.data?.id);
     }
   };
 
   const handleRejectProposal = async () => {
     if (confirm('제안을 거절하시겠습니까?')) {
-      await rejectProposalMutation.mutateAsync(deal.id);
+      await rejectProposalMutation.mutateAsync(deal?.data?.id);
     }
   };
 
   const handlePay = async () => {
     const paymentId = `pay_${Date.now()}`;
-    if (confirm(`${formatCurrency(deal.totalAmount)}을 결제하시겠습니까?`)) {
-      await payMutation.mutateAsync({ dealId: deal.id, paymentId });
+    if (confirm(`${formatCurrency(deal?.data?.totalAmount)}을 결제하시겠습니까?`)) {
+      await payMutation.mutateAsync({ dealId: deal?.data?.id, paymentId });
     }
   };
 
@@ -76,12 +76,12 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       alert('URL을 입력해주세요.');
       return;
     }
-    await submitMutation.mutateAsync({ dealId: deal.id, dto: { url: submitUrl, note: submitNote } });
+    await submitMutation.mutateAsync({ dealId: deal?.data?.id, dto: { url: submitUrl, note: submitNote } });
   };
 
   const handleConfirm = async () => {
     if (confirm('콘텐츠를 승인하시겠습니까?')) {
-      await confirmMutation.mutateAsync(deal.id);
+      await confirmMutation.mutateAsync(deal?.data?.id);
     }
   };
 
@@ -90,7 +90,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       alert('거절 사유를 입력해주세요.');
       return;
     }
-    await rejectContentMutation.mutateAsync({ dealId: deal.id, dto: { reason: rejectReason } });
+    await rejectContentMutation.mutateAsync({ dealId: deal?.data?.id, dto: { reason: rejectReason } });
     setShowRejectModal(false);
   };
 
@@ -127,12 +127,12 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
         {/* 제목 & 상태 */}
         <div className="bg-white rounded-xl p-4">
           <div className="flex items-start justify-between">
-            <h1 className="text-lg font-bold text-gray-900">{deal.title}</h1>
-            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(deal.status)}`}>
-              {formatDealStatus(deal.status)}
+            <h1 className="text-lg font-bold text-gray-900">{deal?.data?.title}</h1>
+            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(deal?.data?.status)}`}>
+              {formatDealStatus(deal?.data?.status)}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">{formatRelativeTime(deal.createdAt)}</p>
+          <p className="text-sm text-gray-500 mt-1">{formatRelativeTime(deal?.data?.createdAt)}</p>
         </div>
 
         {/* 상대방 정보 */}
@@ -158,8 +158,8 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
             </div>
             {role === 'creator' && (
               <div className="text-right text-sm text-gray-500">
-                <p>총액: {formatCurrency(deal.totalAmount)}</p>
-                <p>수수료: {formatCurrency(deal.platformFee)}</p>
+                <p>총액: {formatCurrency(deal?.data?.totalAmount)}</p>
+                <p>수수료: {formatCurrency(deal?.data?.platformFee)}</p>
               </div>
             )}
           </div>
@@ -168,40 +168,40 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
         {/* 설명 */}
         <div className="bg-white rounded-xl p-4">
           <p className="text-sm text-gray-500 mb-2">설명</p>
-          <p className="text-gray-900 whitespace-pre-wrap">{deal.description}</p>
+          <p className="text-gray-900 whitespace-pre-wrap">{deal?.data?.description}</p>
         </div>
 
         {/* 요구사항 */}
-        {deal.requirements && (
+        {deal?.data?.requirements && (
           <div className="bg-white rounded-xl p-4">
             <p className="text-sm text-gray-500 mb-2">요구사항</p>
-            <p className="text-gray-900 whitespace-pre-wrap">{deal.requirements}</p>
+            <p className="text-gray-900 whitespace-pre-wrap">{deal?.data?.requirements}</p>
           </div>
         )}
 
         {/* 제출된 콘텐츠 */}
-        {deal.submittedUrl && (
+        {deal?.data?.submittedUrl && (
           <div className="bg-blue-50 rounded-xl p-4">
             <p className="text-sm text-blue-600 font-medium mb-2">📎 제출된 콘텐츠</p>
-            <a href={deal.submittedUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
-              {deal.submittedUrl}
+            <a href={deal?.data?.submittedUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
+              {deal?.data?.submittedUrl}
             </a>
-            {deal.submittedNote && <p className="text-sm text-gray-600 mt-2">{deal.submittedNote}</p>}
+            {deal?.data?.submittedNote && <p className="text-sm text-gray-600 mt-2">{deal?.data?.submittedNote}</p>}
           </div>
         )}
 
         {/* 거절 사유 */}
-        {deal.rejectionReason && (
+        {deal?.data?.rejectionReason && (
           <div className="bg-red-50 rounded-xl p-4">
             <p className="text-sm text-red-600 font-medium mb-2">❌ 거절 사유</p>
-            <p className="text-gray-900">{deal.rejectionReason}</p>
+            <p className="text-gray-900">{deal?.data?.rejectionReason}</p>
           </div>
         )}
 
         {/* 액션 버튼 */}
         <div className="space-y-3">
           {/* 크리에이터 - 수락/거절 */}
-          {role === 'creator' && deal.status === 'PROPOSED' && (
+          {role === 'creator' && deal?.data?.status === 'PROPOSED' && (
             <div className="flex gap-3">
               <button onClick={handleAccept} disabled={isActionLoading}
                 className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
@@ -215,15 +215,15 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
           )}
 
           {/* 광고주 - 결제 */}
-          {role === 'advertiser' && deal.status === 'ACCEPTED' && (
+          {role === 'advertiser' && deal?.data?.status === 'ACCEPTED' && (
             <button onClick={handlePay} disabled={isActionLoading}
               className="w-full py-3 bg-purple-600 text-white rounded-xl font-medium disabled:opacity-50">
-              {formatCurrency(deal.totalAmount)} 결제하기
+              {formatCurrency(deal?.data?.totalAmount)} 결제하기
             </button>
           )}
 
           {/* 크리에이터 - 제출 */}
-          {role === 'creator' && deal.status === 'PAID' && (
+          {role === 'creator' && deal?.data?.status === 'PAID' && (
             <div className="bg-white rounded-xl p-4 space-y-3">
               <div>
                 <label className="text-sm text-gray-500">콘텐츠 URL *</label>
@@ -248,16 +248,16 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50">
                 제출하기
               </button>
-              {deal.submitDeadline && (
+              {deal?.data?.submitDeadline && (
                 <p className="text-sm text-center text-orange-600">
-                  ⏰ 제출 기한: {new Date(deal.submitDeadline).toLocaleDateString('ko-KR')}
+                  ⏰ 제출 기한: {new Date(deal?.data?.submitDeadline).toLocaleDateString('ko-KR')}
                 </p>
               )}
             </div>
           )}
 
           {/* 광고주 - 승인/수정요청 */}
-          {role === 'advertiser' && deal.status === 'SUBMITTED' && (
+          {role === 'advertiser' && deal?.data?.status === 'SUBMITTED' && (
             <div className="space-y-3">
               <button onClick={handleConfirm} disabled={isActionLoading}
                 className="w-full py-3 bg-green-600 text-white rounded-xl font-medium disabled:opacity-50">
@@ -267,16 +267,16 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 className="w-full py-3 bg-red-100 text-red-600 rounded-xl font-medium disabled:opacity-50">
                 ✕ 수정 요청
               </button>
-              {deal.confirmDeadline && (
+              {deal?.data?.confirmDeadline && (
                 <p className="text-sm text-center text-orange-600">
-                  ⏰ 확인 기한: {new Date(deal.confirmDeadline).toLocaleDateString('ko-KR')}
+                  ⏰ 확인 기한: {new Date(deal?.data?.confirmDeadline).toLocaleDateString('ko-KR')}
                 </p>
               )}
             </div>
           )}
 
           {/* 완료 상태 */}
-          {(deal.status === 'SETTLED' || deal.status === 'CONFIRMED') && (
+          {(deal?.data?.status === 'SETTLED' || deal?.data?.status === 'CONFIRMED') && (
             <div className="text-center py-4">
               <p className="text-4xl mb-2">✅</p>
               <p className="text-green-600 font-medium">거래가 완료되었습니다!</p>
