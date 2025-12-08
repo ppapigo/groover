@@ -138,7 +138,7 @@ function WriteContent() {
         await api.post('/blog/posts', data);
       }
       alert('글이 발행되었습니다!');
-      router.push('/my-posts');
+      router.push('/blog');
     } catch (err) {
       alert('발행에 실패했습니다.');
     } finally {
