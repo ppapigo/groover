@@ -96,7 +96,7 @@ export default function BlogPage() {
                 />
                 <div className="post-meta">
                   <h3>{post.title}</h3>
-                  <p>{post.excerpt}</p>
+                  <p>{post.content?.slice(0, 100)}...</p>
                   <div className="post-footer">
                     <div className="post-tags">
                       {post.tags?.map((tag) => (
