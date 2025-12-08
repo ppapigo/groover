@@ -124,14 +124,14 @@ export default function BlogPage() {
           )}
 
           {/* 더 이상 없음 표시 */}
-          {!hasMore && posts.length > 0 && (
+          {!hasMore && (posts || []).length > 0 && (
             <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
               모든 글을 불러왔습니다
             </div>
           )}
 
           {/* 글 없음 표시 */}
-          {!isLoading && posts.length === 0 && (
+          {!isLoading && (posts || []).length === 0 && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
               아직 글이 없습니다. 첫 번째 글을 작성해보세요!
             </div>
