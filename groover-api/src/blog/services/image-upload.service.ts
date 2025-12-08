@@ -1,11 +1,11 @@
 // src/blog/services/image-upload.service.ts
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// Multer File 인터페이스 직접 정의
 export interface MulterFile {
   fieldname: string;
   originalname: string;
@@ -30,21 +30,18 @@ export interface ImageUploadOptions {
   generateThumbnail?: boolean;
 }
 
-/**
- * 이미지 업로드 서비스
- * - 로컬 저장소 또는 S3 지원
- * - 썸네일 자동 생성
- * - CDN URL 반환
- */
 @Injectable()
 export class ImageUploadService {
   private readonly logger = new Logger(ImageUploadService.name);
   private readonly uploadDir: string;
   private readonly baseUrl: string;
   private readonly useS3: boolean;
+  private readonly s3Client: S3Client;
+  private readonly s3Bucket: string;
+  private readonly s3Region: string;
 
   private readonly defaultOptions: ImageUploadOptions = {
-    maxSizeBytes: 10 * 1024 * 1024, // 10MB
+    maxSizeBytes: 10 * 1024 * 1024,
     allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     generateThumbnail: true,
   };
@@ -52,29 +49,33 @@ export class ImageUploadService {
   constructor(private readonly configService: ConfigService) {
     this.uploadDir = this.configService.get('UPLOAD_DIR') || './uploads/blog';
     this.baseUrl = this.configService.get('CDN_BASE_URL') || '/uploads/blog';
-    this.useS3 = this.configService.get('USE_S3') === 'true';
+    this.s3Bucket = this.configService.get('AWS_S3_BUCKET') || '';
+    this.s3Region = this.configService.get('AWS_REGION') || 'ap-southeast-2';
+    this.useS3 = !!this.s3Bucket;
 
-    // 로컬 디렉토리 생성
-    if (!this.useS3) {
+    if (this.useS3) {
+      this.s3Client = new S3Client({
+        region: this.s3Region,
+        credentials: {
+          accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID') || '',
+          secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY') || '',
+        },
+      });
+      this.logger.log(`S3 업로드 활성화: ${this.s3Bucket}`);
+    } else {
       this.ensureDirectoryExists(this.uploadDir);
       this.ensureDirectoryExists(path.join(this.uploadDir, 'thumbnails'));
     }
   }
 
-  /**
-   * 이미지 업로드
-   */
   async uploadImage(
     file: MulterFile,
     userId: string,
     options?: ImageUploadOptions,
   ): Promise<UploadedImage> {
     const opts = { ...this.defaultOptions, ...options };
-
-    // 유효성 검사
     this.validateFile(file, opts);
 
-    // 파일명 생성 (충돌 방지)
     const filename = this.generateFilename(file.originalname, userId);
     const thumbnailFilename = `thumb_${filename}`;
 
@@ -85,9 +86,6 @@ export class ImageUploadService {
     return this.uploadToLocal(file, filename, thumbnailFilename, opts);
   }
 
-  /**
-   * 로컬 저장소 업로드
-   */
   private async uploadToLocal(
     file: MulterFile,
     filename: string,
@@ -97,13 +95,9 @@ export class ImageUploadService {
     const filePath = path.join(this.uploadDir, filename);
     const thumbnailPath = path.join(this.uploadDir, 'thumbnails', thumbnailFilename);
 
-    // 원본 저장
     await fs.promises.writeFile(filePath, file.buffer);
 
-    // 썸네일 생성 (sharp 없이 원본 복사 - 실제로는 sharp 사용 권장)
     if (options.generateThumbnail) {
-      // TODO: sharp로 리사이즈 구현
-      // 현재는 원본 복사
       await fs.promises.writeFile(thumbnailPath, file.buffer);
     }
 
@@ -115,29 +109,59 @@ export class ImageUploadService {
     };
   }
 
-  /**
-   * S3 업로드 (구현 예시)
-   */
   private async uploadToS3(
     file: MulterFile,
     filename: string,
     thumbnailFilename: string,
     options: ImageUploadOptions,
   ): Promise<UploadedImage> {
-    // TODO: AWS SDK 사용하여 S3 업로드 구현
-    // const s3 = new AWS.S3();
-    // await s3.upload({ Bucket, Key: filename, Body: file.buffer }).promise();
+    const key = `images/${filename}`;
+    const thumbnailKey = `images/thumbnails/${thumbnailFilename}`;
 
-    throw new BadRequestException('S3 업로드는 아직 구현되지 않았습니다.');
+    // 원본 업로드
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.s3Bucket,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+
+    // 썸네일 업로드 (현재는 원본 복사)
+    if (options.generateThumbnail) {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.s3Bucket,
+          Key: thumbnailKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        }),
+      );
+    }
+
+    const baseS3Url = `https://${this.s3Bucket}.s3.${this.s3Region}.amazonaws.com`;
+
+    return {
+      url: `${baseS3Url}/${key}`,
+      thumbnailUrl: `${baseS3Url}/${thumbnailKey}`,
+      size: file.size,
+      mimeType: file.mimetype,
+    };
   }
 
-  /**
-   * 이미지 삭제
-   */
   async deleteImage(imageUrl: string): Promise<void> {
     try {
-      if (this.useS3) {
-        // TODO: S3 삭제
+      if (this.useS3 && imageUrl.includes(this.s3Bucket)) {
+        const key = imageUrl.split('.amazonaws.com/')[1];
+        if (key) {
+          await this.s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: this.s3Bucket,
+              Key: key,
+            }),
+          );
+        }
         return;
       }
 
@@ -156,9 +180,6 @@ export class ImageUploadService {
     }
   }
 
-  /**
-   * 파일 유효성 검사
-   */
   private validateFile(file: MulterFile, options: ImageUploadOptions): void {
     if (!file) {
       throw new BadRequestException('파일이 없습니다.');
@@ -176,9 +197,6 @@ export class ImageUploadService {
     }
   }
 
-  /**
-   * 고유 파일명 생성
-   */
   private generateFilename(originalName: string, userId: string): string {
     const timestamp = Date.now();
     const random = crypto.randomBytes(8).toString('hex');
@@ -188,9 +206,6 @@ export class ImageUploadService {
     return `${userPrefix}_${timestamp}_${random}${ext}`;
   }
 
-  /**
-   * 디렉토리 생성
-   */
   private ensureDirectoryExists(dir: string): void {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
