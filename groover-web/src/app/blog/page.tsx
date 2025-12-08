@@ -86,7 +86,7 @@ export default function BlogPage() {
 
         {/* 포스트 리스트 */}
         <div className="post-list">
-          {posts.map((post, index) => (
+          {(posts || []).map((post, index) => (
             <div key={post.id}>
               <Link href={`/blog/${post.id}`} className="post-card">
                 <img
