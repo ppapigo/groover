@@ -6,22 +6,23 @@ import { join } from 'path';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
+import * as express from 'express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: true,
+    bodyParser: false,
   });
+
+  // Body 크기 제한 - 먼저 설정!
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // 보안 헤더
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }));
   app.use(cookieParser());
-
-  // Body 크기 제한 증가
-  app.useBodyParser('json', { limit: '20mb' });
-  app.useBodyParser('urlencoded', { limit: '20mb', extended: true });
 
   // API 버전 프리픽스
   app.setGlobalPrefix('v1');
@@ -51,7 +52,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
-  // 정적 파일 서빙 (이미지 업로드)
+  // 정적 파일 서빙
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
     setHeaders: (res) => {
