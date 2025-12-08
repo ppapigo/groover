@@ -32,13 +32,13 @@ async function bootstrap() {
     }),
   );
 
-  // CORS 설정
+ // CORS 설정
   app.enableCors({
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://groover.com',
-      'https://blog.groover.com',
+      'https://grooverapp.com',
+      'https://www.grooverapp.com',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
