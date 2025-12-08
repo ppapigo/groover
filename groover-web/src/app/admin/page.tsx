@@ -244,7 +244,7 @@ function UsersTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {data?.items.map((user) => (
+          {data?.data?.items.map((user) => (
             <div key={user.id} className="bg-white rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -281,7 +281,7 @@ function UsersTab() {
           ))}
 
           {/* 페이지네이션 */}
-          {data && data.totalPages > 1 && (
+          {data && data?.data?.totalPages > 1 && (
             <div className="flex justify-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -290,10 +290,10 @@ function UsersTab() {
               >
                 이전
               </button>
-              <span className="px-4 py-2">{page} / {data.totalPages}</span>
+              <span className="px-4 py-2">{page} / {data?.data?.totalPages}</span>
               <button
                 onClick={() => setPage(p => p + 1)}
-                disabled={page === data.totalPages}
+                disabled={page === data?.data?.totalPages}
                 className="px-4 py-2 bg-white rounded-lg disabled:opacity-50"
               >
                 다음
@@ -353,13 +353,13 @@ function ReportsTab() {
             </div>
           ))}
         </div>
-      ) : data?.items.length === 0 ? (
+      ) : data?.data?.items.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500">신고가 없습니다</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {data?.items.map((report) => (
+          {data?.data?.items.map((report) => (
             <div key={report.id} className="bg-white rounded-xl p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
