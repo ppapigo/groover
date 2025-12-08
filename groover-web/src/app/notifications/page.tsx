@@ -14,8 +14,8 @@ export default function NotificationsPage() {
   const { data: unreadData } = useUnreadCount();
   const markAsRead = useMarkAsRead();
 
-  const notifications = data?.pages.flatMap(page => page.items) || [];
-  const unreadCount = unreadData?.count || 0;
+  const notifications = data?.pages.flatMap(page => page.data?.items) || [];
+  const unreadCount = unreadData?.data?.count || 0;
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
