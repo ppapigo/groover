@@ -16,8 +16,7 @@ export default function BlogPage() {
   const feedType = activeCategory === '전체' ? 'latest' : 'tag';
   const tag = activeCategory === '전체' ? undefined : activeCategory;
   
-  const { posts, isLoading, hasMore, error, loadMore, fetchPosts } = useFeed(feedType, tag);
-  
+  const { posts, isLoading, hasMore, error, loadMore, fetchPosts } = useFeed({ category: tag });
   const { targetRef } = useInfiniteScroll({
     onLoadMore: loadMore,
     hasMore,
