@@ -1,16 +1,45 @@
 // src/app/settings/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import api from '@/lib/api';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { logout, logoutAll } = useAuth();
+  const { user, logout, logoutAll } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isProfilePublic, setIsProfilePublic] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetchPrivacySettings();
+  }, []);
+
+  const fetchPrivacySettings = async () => {
+    try {
+      const res = await api.get('/users/me');
+      setIsProfilePublic(res.data.isProfilePublic ?? true);
+    } catch (err) {
+      console.error('설정 불러오기 실패:', err);
+    }
+  };
+
+  const handlePrivacyToggle = async () => {
+    setIsLoading(true);
+    try {
+      await api.put('/users/me/privacy', { isProfilePublic: !isProfilePublic });
+      setIsProfilePublic(!isProfilePublic);
+    } catch (err) {
+      console.error('설정 변경 실패:', err);
+      alert('설정 변경에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -67,6 +96,61 @@ export default function SettingsPage() {
 
         {/* 메뉴 그룹 */}
         <div style={{ padding: '16px' }}>
+          {/* 개인정보 보호 */}
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '13px', color: '#999', marginBottom: '8px', paddingLeft: '4px' }}>
+              개인정보 보호
+            </h3>
+            <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span>🔒</span>
+                  <div>
+                    <span style={{ fontSize: '15px' }}>프로필 공개</span>
+                    <p style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                      {isProfilePublic ? '모든 사용자가 프로필을 볼 수 있습니다' : '프로필이 비공개 상태입니다'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handlePrivacyToggle}
+                  disabled={isLoading}
+                  style={{
+                    width: '50px',
+                    height: '28px',
+                    borderRadius: '14px',
+                    border: 'none',
+                    background: isProfilePublic ? '#22c55e' : '#ccc',
+                    position: 'relative',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: '#fff',
+                      position: 'absolute',
+                      top: '2px',
+                      left: isProfilePublic ? '24px' : '2px',
+                      transition: 'left 0.2s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
           {menuItems.map((group, groupIdx) => (
             <div key={groupIdx} style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '13px', color: '#999', marginBottom: '8px', paddingLeft: '4px' }}>
