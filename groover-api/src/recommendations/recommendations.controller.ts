@@ -13,19 +13,41 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
+import { ChatbotService } from './chatbot.service';
 import { CreateRecommendationDto } from './dto/create-recommendation.dto';
+import { ChatRequestDto } from './dto/chat.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('recommendations')
-@UseGuards(JwtAuthGuard)
 export class RecommendationsController {
-  constructor(private readonly recommendationsService: RecommendationsService) {}
+  constructor(
+    private readonly recommendationsService: RecommendationsService,
+    private readonly chatbotService: ChatbotService,
+  ) {}
+
+  /**
+   * 챗봇 대화 (인증 불필요)
+   * POST /v1/recommendations/chat
+   */
+  @Post('chat')
+  @HttpCode(HttpStatus.OK)
+  async chat(@Body() dto: ChatRequestDto) {
+    const response = await this.chatbotService.chat(dto.message, dto.history);
+
+    return {
+      success: true,
+      data: {
+        message: response,
+      },
+    };
+  }
 
   /**
    * 추천 생성
    * POST /v1/recommendations
    */
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(@Request() req, @Body() dto: CreateRecommendationDto) {
     const result = await this.recommendationsService.createRecommendation(
@@ -45,6 +67,7 @@ export class RecommendationsController {
    * GET /v1/recommendations/:id
    */
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     const result = await this.recommendationsService.getRecommendation(id);
     return {
@@ -58,6 +81,7 @@ export class RecommendationsController {
    * GET /v1/recommendations/history
    */
   @Get()
+  @UseGuards(JwtAuthGuard)
   async getHistory(
     @Request() req,
     @Query('page') page?: number,
