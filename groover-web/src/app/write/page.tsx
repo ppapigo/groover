@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import api from '@/lib/api';
+import imageCompression from 'browser-image-compression';
 
 interface PostData {
   title: string;
@@ -65,9 +66,23 @@ function WriteContent() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    // 이미지 압축 옵션
+    const options = {
+      maxSizeMB: 1,           // 최대 1MB
+      maxWidthOrHeight: 1920, // 최대 1920px
+      useWebWorker: true,
+    };
+
+    // 압축 실행
+    const compressedFile = await imageCompression(file, options);
+    console.log('원본 크기:', file.size / 1024 / 1024, 'MB');
+    console.log('압축 후:', compressedFile.size / 1024 / 1024, 'MB');
+
     const reader = new FileReader();
     reader.onloadend = () => {
       const imageUrl = reader.result as string;
@@ -81,8 +96,12 @@ function WriteContent() {
         setPreviewImage(imageUrl);
       }
     };
-    reader.readAsDataURL(file);
-  };
+    reader.readAsDataURL(compressedFile);
+  } catch (error) {
+    console.error('이미지 압축 실패:', error);
+    alert('이미지 처리에 실패했습니다.');
+  }
+};
 
   const handleAddTag = () => {
     const tag = tagInput.trim().replace('#', '');
