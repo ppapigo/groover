@@ -52,11 +52,15 @@ const addRefreshSubscriber = (callback: (token: string) => void) => {
 };
 
 // 요청 인터셉터 - Access Token 자동 추가
+// 요청 인터셉터 - 수정
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = getAccessToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // 직접 localStorage에서 가져오기
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken');
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
