@@ -1,18 +1,38 @@
 // src/app/profile/page.tsx
-import Link from 'next/link';
-import AppHeader from '@/components/layout/AppHeader';
+'use client';
 
-const mockUser = {
-  name: '쇼핑러버',
-  email: 'user@groover.com',
-  posts: 12,
-  followers: 234,
-  totalEarnings: 285000,
-  pendingAds: 1, // 대기중인 광고 제안
-  unreadMessages: 2, // 읽지 않은 메시지
-};
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import AppHeader from '@/components/layout/AppHeader';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { user, isLoading, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('로그아웃 실패:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <>
+        <AppHeader />
+        <div style={{ padding: '40px', textAlign: 'center' }}>로딩 중...</div>
+      </>
+    );
+  }
+
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
+
   return (
     <>
       <AppHeader />
@@ -39,11 +59,15 @@ export default function ProfilePage() {
               color: '#fff',
             }}
           >
-            👤
+            {user.profileImageUrl ? (
+              <img src={user.profileImageUrl} alt={user.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              '👤'
+            )}
           </div>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{mockUser.name}</h2>
-            <p style={{ fontSize: '13px', color: '#666' }}>{mockUser.email}</p>
+            <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{user.name || '이름 없음'}</h2>
+            <p style={{ fontSize: '13px', color: '#666' }}>{user.email}</p>
           </div>
           <Link
             href="/profile/edit"
@@ -69,39 +93,16 @@ export default function ProfilePage() {
             marginBottom: '24px',
           }}
         >
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '16px',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-            }}
-          >
-            <p style={{ fontSize: '20px', fontWeight: '700' }}>{mockUser.posts}</p>
+          <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '12px' }}>
+            <p style={{ fontSize: '20px', fontWeight: '700' }}>0</p>
             <p style={{ fontSize: '12px', color: '#666' }}>게시글</p>
           </div>
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '16px',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-            }}
-          >
-            <p style={{ fontSize: '20px', fontWeight: '700' }}>{mockUser.followers}</p>
+          <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '12px' }}>
+            <p style={{ fontSize: '20px', fontWeight: '700' }}>0</p>
             <p style={{ fontSize: '12px', color: '#666' }}>팔로워</p>
           </div>
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '16px',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-            }}
-          >
-            <p style={{ fontSize: '20px', fontWeight: '700' }}>
-              {(mockUser.totalEarnings / 10000).toFixed(1)}만
-            </p>
+          <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '12px' }}>
+            <p style={{ fontSize: '20px', fontWeight: '700' }}>0</p>
             <p style={{ fontSize: '12px', color: '#666' }}>수익</p>
           </div>
         </div>
@@ -111,84 +112,17 @@ export default function ProfilePage() {
           💰 수익 관리
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-          <Link
-            href="/wallet"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 16px',
-              background: '#fff',
-              border: '1px solid #eee',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: '#333',
-            }}
-          >
+          <Link href="/wallet" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>💳</span>
             <span style={{ flex: 1, fontSize: '14px' }}>내 지갑</span>
-            <span style={{ fontSize: '14px', fontWeight: '600', color: '#22c55e' }}>
-              {mockUser.totalEarnings.toLocaleString()}원
-            </span>
           </Link>
-          <Link
-            href="/profile/ads"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 16px',
-              background: '#fff',
-              border: '1px solid #eee',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: '#333',
-            }}
-          >
+          <Link href="/profile/ads" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>📢</span>
             <span style={{ flex: 1, fontSize: '14px' }}>광고 제안 관리</span>
-            {mockUser.pendingAds > 0 && (
-              <span
-                style={{
-                  background: '#ef4444',
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                }}
-              >
-                {mockUser.pendingAds}
-              </span>
-            )}
           </Link>
-          <Link
-            href="/profile/bank"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 16px',
-              background: '#fff',
-              border: '1px solid #eee',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: '#333',
-            }}
-          >
+          <Link href="/profile/bank" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>🏦</span>
             <span style={{ flex: 1, fontSize: '14px' }}>정산 계좌 관리</span>
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                background: '#dcfce7',
-                color: '#22c55e',
-              }}
-            >
-              인증완료
-            </span>
           </Link>
         </div>
 
@@ -197,33 +131,18 @@ export default function ProfilePage() {
           📝 내 콘텐츠
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-          {[
-            { href: '/profile/posts', icon: '📄', label: '내 게시글', count: mockUser.posts },
-            { href: '/profile/drafts', icon: '✏️', label: '임시 저장', count: 2 },
-            { href: '/profile/likes', icon: '❤️', label: '좋아요한 글' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '14px 16px',
-                background: '#fff',
-                border: '1px solid #eee',
-                borderRadius: '12px',
-                textDecoration: 'none',
-                color: '#333',
-              }}
-            >
-              <span style={{ fontSize: '20px' }}>{item.icon}</span>
-              <span style={{ flex: 1, fontSize: '14px' }}>{item.label}</span>
-              {item.count !== undefined && (
-                <span style={{ fontSize: '13px', color: '#999' }}>{item.count}</span>
-              )}
-            </Link>
-          ))}
+          <Link href="/profile/posts" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>내 게시글</span>
+          </Link>
+          <Link href="/profile/drafts" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>✏️</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>임시 저장</span>
+          </Link>
+          <Link href="/profile/likes" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>❤️</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>좋아요한 글</span>
+          </Link>
         </div>
 
         {/* 소통 섹션 */}
@@ -231,36 +150,9 @@ export default function ProfilePage() {
           💬 소통
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-          <Link
-            href="/dm"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 16px',
-              background: '#fff',
-              border: '1px solid #eee',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: '#333',
-            }}
-          >
+          <Link href="/messages" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>💬</span>
             <span style={{ flex: 1, fontSize: '14px' }}>메시지</span>
-            {mockUser.unreadMessages > 0 && (
-              <span
-                style={{
-                  background: '#ef4444',
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                }}
-              >
-                {mockUser.unreadMessages}
-              </span>
-            )}
           </Link>
         </div>
 
@@ -269,35 +161,26 @@ export default function ProfilePage() {
           ⚙️ 설정
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[
-            { href: '/settings', icon: '⚙️', label: '설정' },
-            { href: '/help', icon: '❓', label: '고객센터' },
-            { href: '/terms', icon: '📋', label: '이용약관' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '14px 16px',
-                background: '#fff',
-                border: '1px solid #eee',
-                borderRadius: '12px',
-                textDecoration: 'none',
-                color: '#333',
-              }}
-            >
-              <span style={{ fontSize: '20px' }}>{item.icon}</span>
-              <span style={{ flex: 1, fontSize: '14px' }}>{item.label}</span>
-              <span style={{ color: '#ccc' }}>›</span>
-            </Link>
-          ))}
+          <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>⚙️</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>설정</span>
+            <span style={{ color: '#ccc' }}>›</span>
+          </Link>
+          <Link href="/help" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>❓</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>고객센터</span>
+            <span style={{ color: '#ccc' }}>›</span>
+          </Link>
+          <Link href="/terms" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>📋</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>이용약관</span>
+            <span style={{ color: '#ccc' }}>›</span>
+          </Link>
         </div>
 
         {/* 로그아웃 */}
         <button
+          onClick={handleLogout}
           style={{
             width: '100%',
             marginTop: '24px',
