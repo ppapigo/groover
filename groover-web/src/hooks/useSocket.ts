@@ -25,7 +25,7 @@ export function useSocket() {
 
     console.log('소켓 연결 시도...');
     
-    const socket = io('http://localhost:3000/dm', {
+   const socket = io(`${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'http://localhost:3000'}/dm`, {
       auth: { token },
       transports: ['polling', 'websocket'],
       reconnection: true,
