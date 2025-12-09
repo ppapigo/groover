@@ -35,6 +35,7 @@ model User {
   statsCache      UserStatsCache?
   adminActions    AdminActionLog[] @relation("AdminActions")
   googleId String? @unique
+  isProfilePublic  Boolean  @default(true)  // 프로필 공개 여부
   
   carts           Cart[]
   recommendations Recommendation[]
@@ -73,6 +74,8 @@ model User {
   refreshTokens RefreshToken[]
     
   fcmTokens FcmToken[]
+
+  
   
   @@map("users")
 }

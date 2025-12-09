@@ -14,6 +14,7 @@ export class UsersService {
         email: true,
         name: true,
         profileImageUrl: true,
+        isProfilePublic: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -39,12 +40,25 @@ export class UsersService {
         email: true,
         name: true,
         profileImageUrl: true,
+        isProfilePublic: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
     return user;
+  }
+
+  async updatePrivacy(userId: string, isProfilePublic: boolean) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { isProfilePublic },
+      select: {
+        id: true,
+        isProfilePublic: true,
+      },
+    });
+    return { success: true, data: user };
   }
 
   async deleteMe(userId: string) {
