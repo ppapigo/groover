@@ -295,78 +295,90 @@ export class DmService {
   /**
    * 직거래 시도 검사
    */
-  private async checkDirectTrade(
-    userId: string,
-    threadId: string,
-    content: string,
-  ): Promise<{ allowed: boolean; message?: string }> {
-    const detectedTypes: string[] = [];
-
-    for (const { pattern, type } of BLOCKED_PATTERNS) {
-      const regex = new RegExp(pattern.source, pattern.flags);
-      if (regex.test(content)) {
-        detectedTypes.push(type);
-      }
-    }
-
-    if (detectedTypes.length === 0) {
-      return { allowed: true };
-    }
-
-    // 직거래 시도 로그 저장
-    try {
-      await this.prisma.directTradeAttempt.create({
-        data: {
-          userId,
-          threadId,
-          originalContent: content,
-          detectedPatterns: detectedTypes,
-          detectedTypes: detectedTypes,
-        },
-      });
-
-      // 경고 횟수 증가
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { warningCount: { increment: 1 } },
-      });
-
-      await this.prisma.userWarning.create({
-        data: {
-          userId,
-          type: 'DIRECT_TRADE_ATTEMPT',
-          reason: `직거래 시도: ${detectedTypes.join(', ')}`,
-        },
-      });
-
-      // 경고 3회 이상 → 광고 매칭 정지
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { warningCount: true },
-      });
-
-      if (user && user.warningCount >= 3) {
-        const suspendedUntil = new Date();
-        suspendedUntil.setDate(suspendedUntil.getDate() + 1);
-
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: {
-            adMatchingSuspended: true,
-            suspendedUntil,
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error('직거래 로그 저장 실패:', error);
-    }
-
-    return {
-      allowed: false,
-      message: '안전결제 보호를 위해 외부 연락처 공유가 제한됩니다. 모든 광고비 결제는 Groover를 통해 진행해주세요.',
-    };
+ private async checkDirectTrade(
+  userId: string,
+  threadId: string,
+  content: string,
+): Promise<{ allowed: boolean; message?: string }> {
+  // S3 이미지 URL은 허용
+  const allowedDomains = [
+    'grooverapp-images.s3.ap-southeast-2.amazonaws.com',
+    's3.ap-southeast-2.amazonaws.com',
+  ];
+  
+  const isAllowedUrl = allowedDomains.some(domain => content.includes(domain));
+  if (isAllowedUrl) {
+    return { allowed: true };
   }
 
+  const detectedTypes: string[] = [];
+
+  for (const { pattern, type } of BLOCKED_PATTERNS) {
+    const regex = new RegExp(pattern.source, pattern.flags);
+    if (regex.test(content)) {
+      detectedTypes.push(type);
+    }
+  }
+
+  if (detectedTypes.length === 0) {
+    return { allowed: true };
+  }
+
+  // 직거래 시도 로그 저장
+  try {
+    await this.prisma.directTradeAttempt.create({
+      data: {
+        userId,
+        threadId,
+        originalContent: content,
+        detectedPatterns: detectedTypes,
+        detectedTypes: detectedTypes,
+      },
+    });
+
+    // 경고 횟수 증가
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { warningCount: { increment: 1 } },
+    });
+
+    await this.prisma.userWarning.create({
+      data: {
+        userId,
+        type: 'DIRECT_TRADE_ATTEMPT',
+        reason: `직거래 시도: ${detectedTypes.join(', ')}`,
+      },
+    });
+
+    // 경고 3회 이상 → 광고 매칭 정지
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { warningCount: true },
+    });
+
+    if (user && user.warningCount >= 3) {
+      const suspendedUntil = new Date();
+      suspendedUntil.setDate(suspendedUntil.getDate() + 1);
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          adMatchingSuspended: true,
+          suspendedUntil,
+        },
+      });
+    }
+  } catch (error) {
+    this.logger.error('직거래 로그 저장 실패:', error);
+  }
+
+  return {
+    allowed: false,
+    message: '안전결제 보호를 위해 외부 연락처 공유가 제한됩니다. 모든 광고비 결제는 Groover를 통해 진행해주세요.',
+  };
+}
+
+    
   // ========================================
   // 헬퍼 메서드
   // ========================================
