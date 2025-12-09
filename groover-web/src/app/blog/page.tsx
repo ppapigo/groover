@@ -89,10 +89,13 @@ export default function BlogPage() {
           {(posts || []).map((post, index) => (
             <div key={post.id}>
               <Link href={`/blog/${post.slug}`} className="post-card">
-                <img
-                  className="post-thumb"
-                 src={post.previewImage || '/images/no-image.png'}
-                />
+               {post.previewImage && (
+                  <img
+                    className="post-thumb"
+                    src={post.previewImage}
+                    alt={post.title}
+                  />
+                )}
                 <div className="post-meta">
                   <h3>{post.title}</h3>
                   <p>{post.content?.slice(0, 100)}...</p>

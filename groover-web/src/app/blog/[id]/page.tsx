@@ -100,19 +100,21 @@ export default function BlogDetailPage({ params }: { params: { id: string } }) {
       <AppHeader />
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
         {/* 대표 이미지 */}
-        {post.previewImage && (
-          <img
-            src={post.previewImage}
-            alt={post.title}
-            style={{
-              width: '100%',
-              maxHeight: '400px',
-              objectFit: 'cover',
-              borderRadius: '12px',
-              marginBottom: '20px',
-            }}
-          />
-        )}
+       {post.previewImage && !post.content.includes('![') && (
+            <img
+              src={post.previewImage}
+              alt={post.title}
+              style={{
+                width: '100%',
+                maxHeight: '400px',
+                objectFit: 'cover',
+                borderRadius: '12px',
+                marginBottom: '20px',
+              }}
+            />
+          )}
+
+        
 
         {/* 제목 */}
         <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '16px' }}>
