@@ -152,9 +152,9 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
       // 이미지 URL을 메시지로 전송
       const res = await api.post('/dm/threads/' + params.id + '/messages', { 
-        content: imageUrl,
-        type: 'image'
-      });
+      content: imageUrl,
+      messageType: 'IMAGE'
+    });
       setMessages(prev => [...prev, res.data.data || res.data]);
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
@@ -271,7 +271,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           <input 
             value={input} 
             onChange={handleInputChange} 
-            onKeyPress={e => e.key === 'Enter' && handleSendMessage()} 
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()} 
             placeholder="메시지 입력..." 
             style={{ flex: 1, padding: '12px 16px', border: '1px solid #eee', borderRadius: 24, fontSize: 14, outline: 'none' }} 
           />
