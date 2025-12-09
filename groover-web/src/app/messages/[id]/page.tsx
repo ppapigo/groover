@@ -153,7 +153,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       // 이미지 URL을 메시지로 전송
       const res = await api.post('/dm/threads/' + params.id + '/messages', { 
       content: imageUrl,
-      messageType: 'IMAGE'
+      messageType: 'image'
     });
       setMessages(prev => [...prev, res.data.data || res.data]);
     } catch (error) {
