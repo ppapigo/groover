@@ -91,8 +91,7 @@ export default function BlogPage() {
               <Link href={`/blog/${post.slug}`} className="post-card">
                 <img
                   className="post-thumb"
-                  src={post.thumbnail || 'https://via.placeholder.com/300x200?text=No+Image'}
-                  alt={post.title}
+                 src={post.previewImage || '/images/no-image.png'}
                 />
                 <div className="post-meta">
                   <h3>{post.title}</h3>

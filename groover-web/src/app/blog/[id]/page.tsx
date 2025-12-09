@@ -161,13 +161,30 @@ export default function BlogDetailPage({ params }: { params: { id: string } }) {
 
         {/* 본문 */}
         <div style={{
-          fontSize: '16px',
-          lineHeight: '1.8',
-          whiteSpace: 'pre-wrap',
-          marginBottom: '40px',
-        }}>
-          {post.content}
-        </div>
+            fontSize: '16px',
+            lineHeight: '1.8',
+            marginBottom: '40px',
+          }}>
+            {post.content.split('\n').map((line, index) => {
+              // 마크다운 이미지 파싱: ![alt](url)
+              const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+              if (imageMatch) {
+                return (
+                  <img
+                    key={index}
+                    src={imageMatch[2]}
+                    alt={imageMatch[1]}
+                    style={{
+                      maxWidth: '100%',
+                      borderRadius: '8px',
+                      margin: '16px 0',
+                    }}
+                  />
+                );
+              }
+              return <p key={index} style={{ margin: '8px 0' }}>{line || '\u00A0'}</p>;
+            })}
+          </div>
 
         {/* 좋아요 / 조회수 */}
         <div style={{

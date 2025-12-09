@@ -14,6 +14,7 @@ interface Post {
   title: string;
   content: string;
   thumbnail?: string;
+  previewImage?: string; 
   category: string;
   tags: string[];
   author: Author;
