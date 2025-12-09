@@ -6,6 +6,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
 import api from '@/lib/api';
+import imageCompression from 'browser-image-compression';
 
 interface Message {
   id: string;
@@ -13,6 +14,8 @@ interface Message {
   senderId: string;
   createdAt: string;
   isRead: boolean;
+  type?: 'text' | 'image' | 'ad_proposal';
+  metadata?: any;
 }
 
 interface Participant {
@@ -32,40 +35,34 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 초기 데이터 로드
   useEffect(() => {
     fetchConversation();
   }, [params.id]);
 
-  // 소켓 연결 및 이벤트 리스너
   useEffect(() => {
     if (!isConnected) return;
-
-    // 스레드 참가
     joinThread(params.id);
 
-    // 새 메시지 수신
     const unsubMessage = on('new_message', (data: any) => {
       if (data.threadId === params.id) {
         setMessages(prev => [...prev, data.message]);
-        // 상대방 메시지면 읽음 처리
         if (data.message.senderId !== user?.id) {
           markAsRead(params.id);
         }
       }
     });
 
-    // 읽음 상태 업데이트
     const unsubRead = on('messages_read', (data: any) => {
       if (data.threadId === params.id) {
         setMessages(prev => prev.map(m => ({ ...m, isRead: true })));
       }
     });
 
-    // 타이핑 상태
     const unsubTyping = on('user_typing', (data: any) => {
       if (data.threadId === params.id && data.userId !== user?.id) {
         setIsPartnerTyping(data.isTyping);
@@ -80,7 +77,6 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     };
   }, [isConnected, params.id, user?.id]);
 
-  // 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -88,9 +84,8 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const fetchConversation = async () => {
     try {
       const res = await api.get('/dm/threads/' + params.id);
-      setParticipant(res.data.data.partner);
-      setMessages(res.data.data.messages || []);
-      // 읽음 처리
+      setParticipant(res.data.data?.partner || res.data.partner);
+      setMessages(res.data.data?.messages || res.data.messages || []);
       if (isConnected) markAsRead(params.id);
     } catch {
       setParticipant({ id: 'user1', name: '사용자', profileImageUrl: null });
@@ -100,54 +95,98 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // 타이핑 핸들러
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
-
-    // 타이핑 표시
     if (isConnected) {
       setTyping(params.id, true);
-
-      // 2초 후 타이핑 종료
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      typingTimeoutRef.current = setTimeout(() => {
-        setTyping(params.id, false);
-      }, 2000);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setTyping(params.id, false), 2000);
     }
   };
 
   const handleSendMessage = async () => {
     if (!input.trim() || isSending) return;
-
     const content = input.trim();
     setInput('');
     setIsSending(true);
-
-    // 타이핑 종료
-    if (isConnected) {
-      setTyping(params.id, false);
-    }
+    if (isConnected) setTyping(params.id, false);
 
     try {
       if (isConnected) {
-        // 웹소켓으로 전송
         await socketSend(params.id, content);
       } else {
-        // HTTP 폴백
         const res = await api.post('/dm/threads/' + params.id + '/messages', { content });
-        setMessages(prev => [...prev, res.data.data]);
+        setMessages(prev => [...prev, res.data.data || res.data]);
       }
     } catch (error) {
       console.error('메시지 전송 실패:', error);
-      setInput(content); // 실패 시 복원
+      setInput(content);
     } finally {
       setIsSending(false);
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setShowAttachMenu(false);
+    setIsSending(true);
+
+    try {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
+
+      const formData = new FormData();
+      formData.append('image', compressedFile);
+
+      const token = localStorage.getItem('accessToken');
+      const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/images/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      const imageUrl = uploadData.data?.url || uploadData.url;
+
+      // 이미지 URL을 메시지로 전송
+      const res = await api.post('/dm/threads/' + params.id + '/messages', { 
+        content: imageUrl,
+        type: 'image'
+      });
+      setMessages(prev => [...prev, res.data.data || res.data]);
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      alert('이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleAdProposal = () => {
+    setShowAttachMenu(false);
+    router.push(`/deals/new?userId=${participant?.id}`);
+  };
+
   const formatTime = (d: string) => new Date(d).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+  const renderMessage = (msg: Message) => {
+    const isImage = msg.type === 'image' || msg.content.startsWith('https://') && (msg.content.includes('.jpg') || msg.content.includes('.png') || msg.content.includes('.jpeg') || msg.content.includes('s3.'));
+    
+    if (isImage) {
+      return (
+        <img 
+          src={msg.content} 
+          alt="이미지" 
+          style={{ maxWidth: '200px', borderRadius: 12, cursor: 'pointer' }}
+          onClick={() => window.open(msg.content, '_blank')}
+        />
+      );
+    }
+    
+    return msg.content;
+  };
 
   return (
     <AuthGuard>
@@ -162,9 +201,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           </div>
           <div>
             <div style={{ fontWeight: 600 }}>{participant?.name}</div>
-            {isConnected && (
-              <div style={{ fontSize: 12, color: '#22c55e' }}>● 연결됨</div>
-            )}
+            {isConnected && <div style={{ fontSize: 12, color: '#22c55e' }}>● 연결됨</div>}
           </div>
         </header>
 
@@ -173,9 +210,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           {isLoading ? (
             <div style={{ textAlign: 'center', color: '#999' }}>로딩 중...</div>
           ) : messages.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#999', marginTop: 40 }}>
-              대화를 시작해보세요!
-            </div>
+            <div style={{ textAlign: 'center', color: '#999', marginTop: 40 }}>대화를 시작해보세요!</div>
           ) : (
             messages.map(msg => (
               <div key={msg.id} style={{ display: 'flex', justifyContent: msg.senderId === user?.id ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
@@ -187,32 +222,52 @@ export default function ChatPage({ params }: { params: { id: string } }) {
                     color: msg.senderId === user?.id ? '#fff' : '#333', 
                     fontSize: 14 
                   }}>
-                    {msg.content}
+                    {renderMessage(msg)}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: msg.senderId === user?.id ? 'flex-end' : 'flex-start', gap: 2 }}>
                     <span style={{ fontSize: 11, color: '#999' }}>{formatTime(msg.createdAt)}</span>
-                    {msg.senderId === user?.id && msg.isRead && (
-                      <span style={{ fontSize: 10, color: '#22c55e' }}>읽음</span>
-                    )}
+                    {msg.senderId === user?.id && msg.isRead && <span style={{ fontSize: 10, color: '#22c55e' }}>읽음</span>}
                   </div>
                 </div>
               </div>
             ))
           )}
-          
-          {/* 타이핑 표시 */}
           {isPartnerTyping && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#999', fontSize: 13 }}>
-              <span>입력 중</span>
-              <span style={{ animation: 'pulse 1s infinite' }}>...</span>
+              <span>입력 중...</span>
             </div>
           )}
-          
           <div ref={messagesEndRef} />
         </div>
 
+        {/* 첨부 메뉴 */}
+        {showAttachMenu && (
+          <div style={{ padding: 16, background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: 24, justifyContent: 'center' }}>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#e8f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🖼️</div>
+              <span style={{ fontSize: 12, color: '#666' }}>사진</span>
+            </button>
+            <button
+              onClick={handleAdProposal}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#fff3e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📢</div>
+              <span style={{ fontSize: 12, color: '#666' }}>광고제안</span>
+            </button>
+          </div>
+        )}
+
         {/* 입력창 */}
-        <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
+        <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowAttachMenu(!showAttachMenu)}
+            style={{ width: 40, height: 40, borderRadius: '50%', background: showAttachMenu ? '#0f62fe' : '#f5f5f5', color: showAttachMenu ? '#fff' : '#666', border: 'none', fontSize: 20, cursor: 'pointer' }}
+          >
+            +
+          </button>
           <input 
             value={input} 
             onChange={handleInputChange} 
@@ -223,19 +278,19 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           <button 
             onClick={handleSendMessage} 
             disabled={!input.trim() || isSending} 
-            style={{ 
-              padding: '12px 20px', 
-              background: input.trim() && !isSending ? '#0f62fe' : '#ccc', 
-              color: '#fff', 
-              border: 'none', 
-              borderRadius: 24, 
-              fontWeight: 600, 
-              cursor: input.trim() && !isSending ? 'pointer' : 'default' 
-            }}
+            style={{ padding: '12px 20px', background: input.trim() && !isSending ? '#0f62fe' : '#ccc', color: '#fff', border: 'none', borderRadius: 24, fontWeight: 600, cursor: input.trim() && !isSending ? 'pointer' : 'default' }}
           >
             {isSending ? '...' : '전송'}
           </button>
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          style={{ display: 'none' }}
+        />
       </div>
     </AuthGuard>
   );
