@@ -46,9 +46,13 @@ export default function SearchPage() {
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query)}`
       );
       const data = await res.json();
-      if (data.success) {
-        setResults(data.data?.items || data.data || []);
-      }
+     if (data.posts) {
+          setResults(data.posts);
+        } else if (data.data?.posts) {
+          setResults(data.data.posts);
+        } else {
+          setResults([]);
+        }
     } catch (err) {
       console.error('검색 실패:', err);
     } finally {
