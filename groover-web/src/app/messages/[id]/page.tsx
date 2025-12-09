@@ -82,18 +82,25 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   }, [messages]);
 
   const fetchConversation = async () => {
-    try {
-      const res = await api.get('/dm/threads/' + params.id);
-      setParticipant(res.data.data?.partner || res.data.partner);
-      setMessages(res.data.data?.messages || res.data.messages || []);
-      if (isConnected) markAsRead(params.id);
-    } catch {
-      setParticipant({ id: 'user1', name: '사용자', profileImageUrl: null });
-      setMessages([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    // 스레드 정보 가져오기
+    const threadRes = await api.get('/dm/threads/' + params.id);
+    setParticipant(threadRes.data.data?.partner || threadRes.data.partner || threadRes.data);
+
+    // 메시지 목록 가져오기
+    const messagesRes = await api.get('/dm/threads/' + params.id + '/messages');
+    const messagesData = messagesRes.data.data?.items || messagesRes.data.items || messagesRes.data.data || messagesRes.data || [];
+    setMessages(Array.isArray(messagesData) ? messagesData : []);
+
+    if (isConnected) markAsRead(params.id);
+  } catch (err) {
+    console.error('대화 불러오기 실패:', err);
+    setParticipant({ id: 'user1', name: '사용자', profileImageUrl: null });
+    setMessages([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
