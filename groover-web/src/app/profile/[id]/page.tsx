@@ -57,7 +57,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
       return; 
     }
     try {
-      const res = await api.post('/dm/start', { userId: params.id });
+      const res = await api.post('/dm/start', { targetUserId: params.id });
       const threadId = res.data.data?.id || res.data.id;
       router.push(`/messages/${threadId}`);
     } catch (err) {

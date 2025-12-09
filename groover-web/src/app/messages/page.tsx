@@ -49,7 +49,7 @@ export default function MessagesPage() {
 
   const startNewChat = async (userId: string) => {
     try {
-      const res = await api.post('/dm/start', { userId });
+      const res = await api.post('/dm/start', { targetUserId: userId });
       const threadId = res.data.data?.id || res.data.id;
       setShowNewChat(false);
       router.push(`/messages/${threadId}`);
