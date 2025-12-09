@@ -74,14 +74,14 @@ export class SearchService {
     }
 
     // Posts 검색 (Post 모델이 있다면)
-    // if (type === SearchType.ALL || type === SearchType.POSTS) {
-    //   searchPromises.push(
-    //     this.searchPosts(query, skip, limit, sort).then((r) => {
-    //       results.posts = r.items;
-    //       results.total.posts = r.total;
-    //     }),
-    //   );
-    // }
+     if (type === SearchType.ALL || type === SearchType.POSTS) {
+       searchPromises.push(
+         this.searchPosts(query, skip, limit, sort).then((r) => {
+           results.posts = r.items;
+           results.total.posts = r.total;
+         }),
+       );
+     }
 
     await Promise.all(searchPromises);
 
@@ -221,7 +221,72 @@ export class SearchService {
       total,
     };
   }
+  // ============================================
+  // Posts 검색
+  // ============================================
+  private async searchPosts(
+    query: string,
+    skip: number,
+    limit: number,
+    sort?: string,
+  ): Promise<{ items: any[]; total: number }> {
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'popular') {
+      orderBy = { viewCount: 'desc' };
+    }
 
+    const [posts, total] = await Promise.all([
+      this.prisma.post.findMany({
+        where: {
+          OR: [
+            { title: { contains: query, mode: 'insensitive' } },
+            { content: { contains: query, mode: 'insensitive' } },
+            { tags: { has: query } },
+          ],
+          status: 'PUBLISHED',
+        },
+        select: {
+          id: true,
+          title: true,
+          excerpt: true,
+          previewImage: true,
+          slug: true,
+          viewCount: true,
+          likeCount: true,
+          user: {
+            select: { id: true, name: true },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy,
+      }),
+      this.prisma.post.count({
+        where: {
+          OR: [
+            { title: { contains: query, mode: 'insensitive' } },
+            { content: { contains: query, mode: 'insensitive' } },
+            { tags: { has: query } },
+          ],
+          status: 'PUBLISHED',
+        },
+      }),
+    ]);
+
+    return {
+      items: posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        excerpt: p.excerpt,
+        previewImage: p.previewImage,
+        slug: p.slug,
+        viewCount: p.viewCount,
+        likeCount: p.likeCount,
+        author: p.user,
+      })),
+      total,
+    };
+  }
   // ============================================
   // 자동완성
   // ============================================
