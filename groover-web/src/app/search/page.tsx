@@ -1,11 +1,60 @@
 // src/app/search/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
+
+interface SearchResult {
+  id: string;
+  title: string;
+  excerpt: string;
+  previewImage: string | null;
+  slug: string;
+  author: {
+    id: string;
+    name: string;
+  };
+  viewCount: number;
+  likeCount: number;
+}
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+
+    const debounce = setTimeout(() => {
+      handleSearch();
+    }, 300);
+
+    return () => clearTimeout(debounce);
+  }, [query]);
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query)}`
+      );
+      const data = await res.json();
+      if (data.success) {
+        setResults(data.data?.items || data.data || []);
+      }
+    } catch (err) {
+      console.error('검색 실패:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <>
@@ -24,38 +73,91 @@ export default function SearchPage() {
           />
         </div>
 
-        {query && (
-          <div style={{ marginTop: '24px', textAlign: 'left' }}>
-            <p style={{ fontSize: '14px', color: '#666' }}>
-              "{query}" 검색 결과가 여기에 표시됩니다.
+        {/* 로딩 */}
+        {isLoading && (
+          <div style={{ marginTop: '24px', textAlign: 'center', color: '#666' }}>
+            검색 중...
+          </div>
+        )}
+
+        {/* 검색 결과 */}
+        {!isLoading && query && results.length > 0 && (
+          <div style={{ marginTop: '24px' }}>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+              "{query}" 검색 결과 {results.length}건
             </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {results.map((post) => (
+                <Link
+                  key={post.id}
+                  href={`/blog/${post.slug}`}
+                  style={{
+                    display: 'flex',
+                    background: '#fff',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    border: '1px solid #eee',
+                  }}
+                >
+                  {post.previewImage && (
+                    <img
+                      src={post.previewImage}
+                      alt={post.title}
+                      style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                    />
+                  )}
+                  <div style={{ padding: '12px', flex: 1 }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>
+                      {post.title}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+                      {post.excerpt?.slice(0, 50)}...
+                    </p>
+                    <div style={{ fontSize: '12px', color: '#999' }}>
+                      {post.author?.name} · 👁 {post.viewCount} · ❤️ {post.likeCount}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 검색 결과 없음 */}
+        {!isLoading && query && results.length === 0 && (
+          <div style={{ marginTop: '24px', textAlign: 'center', color: '#999' }}>
+            "{query}"에 대한 검색 결과가 없습니다.
           </div>
         )}
 
         {/* 인기 검색어 */}
-        <div style={{ marginTop: '32px', textAlign: 'left' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>
-            🔥 인기 검색어
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {['캠핑', '육아', '다이슨', '자취템', '가성비', '겨울옷'].map((keyword) => (
-              <button
-                key={keyword}
-                onClick={() => setQuery(keyword)}
-                style={{
-                  padding: '8px 14px',
-                  fontSize: '13px',
-                  background: '#f5f5f5',
-                  border: 'none',
-                  borderRadius: '999px',
-                  cursor: 'pointer',
-                }}
-              >
-                {keyword}
-              </button>
-            ))}
+        {!query && (
+          <div style={{ marginTop: '32px', textAlign: 'left' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>
+              🔥 인기 검색어
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {['캠핑', '육아', '다이슨', '자취템', '가성비', '겨울옷'].map((keyword) => (
+                <button
+                  key={keyword}
+                  onClick={() => setQuery(keyword)}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    background: '#f5f5f5',
+                    border: 'none',
+                    borderRadius: '999px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {keyword}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
