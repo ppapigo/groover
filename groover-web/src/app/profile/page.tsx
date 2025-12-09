@@ -108,10 +108,16 @@ export default function ProfilePage() {
         </div>
 
         {/* 수익 관리 섹션 */}
+        
         <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginBottom: '10px' }}>
           💰 수익 관리
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '20px' }}>📊</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>대시보드</span>
+            <span style={{ color: '#ccc' }}>›</span>
+          </Link>
           <Link href="/wallet" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>💳</span>
             <span style={{ flex: 1, fontSize: '14px' }}>내 지갑</span>
