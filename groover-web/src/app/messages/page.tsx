@@ -24,14 +24,17 @@ export default function MessagesPage() {
 
   useEffect(() => { fetchConversations(); }, []);
 
-  const fetchConversations = async () => {
-    try {
-      const res = await api.get('/dm/threads');
-      setConversations(res.data.data || res.data || []);
-    } catch {
-      setConversations([]);
-    } finally { setIsLoading(false); }
-  };
+ const fetchConversations = async () => {
+  try {
+    const res = await api.get('/dm/threads');
+    const data = res.data.data || res.data || [];
+    setConversations(Array.isArray(data) ? data : []);
+  } catch {
+    setConversations([]);
+  } finally { 
+    setIsLoading(false); 
+  }
+};
 
   const handleSearchUser = async (query: string) => {
     setSearchUser(query);
