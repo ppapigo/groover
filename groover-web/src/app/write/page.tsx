@@ -66,43 +66,61 @@ function WriteContent() {
     }
   };
 
- const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
   try {
-    // 이미지 압축 옵션
+    // 이미지 압축
     const options = {
-      maxSizeMB: 1,           // 최대 1MB
-      maxWidthOrHeight: 1920, // 최대 1920px
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
       useWebWorker: true,
     };
 
-    // 압축 실행
     const compressedFile = await imageCompression(file, options);
     console.log('원본 크기:', file.size / 1024 / 1024, 'MB');
     console.log('압축 후:', compressedFile.size / 1024 / 1024, 'MB');
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const imageUrl = reader.result as string;
-      if (contentRef.current) {
-        const start = contentRef.current.selectionStart;
-        const end = contentRef.current.selectionEnd;
-        const newContent = content.substring(0, start) + `\n![이미지](${imageUrl})\n` + content.substring(end);
-        setContent(newContent);
-      }
-      if (!previewImage) {
-        setPreviewImage(imageUrl);
-      }
-    };
-    reader.readAsDataURL(compressedFile);
+    // S3에 업로드
+    const formData = new FormData();
+    formData.append('image', compressedFile);
+
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/images/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error('이미지 업로드 실패');
+    }
+
+    const data = await res.json();
+    const imageUrl = data.data?.url || data.url;
+
+    // 에디터에 이미지 URL 삽입
+    if (contentRef.current) {
+      const start = contentRef.current.selectionStart;
+      const end = contentRef.current.selectionEnd;
+      const newContent = content.substring(0, start) + `\n![이미지](${imageUrl})\n` + content.substring(end);
+      setContent(newContent);
+    }
+
+    // 대표 이미지가 없으면 첫 이미지를 대표로
+    if (!previewImage) {
+      setPreviewImage(imageUrl);
+    }
+
+    alert('이미지가 업로드되었습니다!');
   } catch (error) {
-    console.error('이미지 압축 실패:', error);
-    alert('이미지 처리에 실패했습니다.');
+    console.error('이미지 업로드 실패:', error);
+    alert('이미지 업로드에 실패했습니다.');
   }
 };
-
   const handleAddTag = () => {
     const tag = tagInput.trim().replace('#', '');
     if (tag && !tags.includes(tag) && tags.length < 10) {
