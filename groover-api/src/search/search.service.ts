@@ -225,68 +225,72 @@ export class SearchService {
   // Posts 검색
   // ============================================
   private async searchPosts(
-    query: string,
-    skip: number,
-    limit: number,
-    sort?: string,
-  ): Promise<{ items: any[]; total: number }> {
-    let orderBy: any = { createdAt: 'desc' };
-    if (sort === 'popular') {
-      orderBy = { viewCount: 'desc' };
-    }
-
-    const [posts, total] = await Promise.all([
-      this.prisma.post.findMany({
-        where: {
-          OR: [
-            { title: { contains: query, mode: 'insensitive' } },
-            { content: { contains: query, mode: 'insensitive' } },
-            { tags: { has: query } },
-          ],
-          status: 'PUBLISHED',
-        },
-        select: {
-          id: true,
-          title: true,
-          excerpt: true,
-          previewImage: true,
-          slug: true,
-          viewCount: true,
-          likeCount: true,
-          user: {
-            select: { id: true, name: true },
-          },
-        },
-        skip,
-        take: limit,
-        orderBy,
-      }),
-      this.prisma.post.count({
-        where: {
-          OR: [
-            { title: { contains: query, mode: 'insensitive' } },
-            { content: { contains: query, mode: 'insensitive' } },
-            { tags: { has: query } },
-          ],
-          status: 'PUBLISHED',
-        },
-      }),
-    ]);
-
-    return {
-      items: posts.map((p) => ({
-        id: p.id,
-        title: p.title,
-        excerpt: p.excerpt,
-        previewImage: p.previewImage,
-        slug: p.slug,
-        viewCount: p.viewCount,
-        likeCount: p.likeCount,
-        author: p.user,
-      })),
-      total,
-    };
+  query: string,
+  skip: number,
+  limit: number,
+  sort?: string,
+): Promise<{ items: any[]; total: number }> {
+  let orderBy: any = { createdAt: 'desc' };
+  if (sort === 'popular') {
+    orderBy = { viewCount: 'desc' };
   }
+
+  // # 으로 시작하면 태그 전용 검색
+  const isTagSearch = query.startsWith('#');
+  const searchTerm = isTagSearch ? query.slice(1) : query;
+
+  const whereCondition = isTagSearch
+    ? {
+        tags: { has: searchTerm },
+        status: 'PUBLISHED',
+      }
+    : {
+        OR: [
+          { title: { contains: searchTerm, mode: 'insensitive' } },
+          { content: { contains: searchTerm, mode: 'insensitive' } },
+          { tags: { has: searchTerm } },
+        ],
+        status: 'PUBLISHED',
+      };
+
+  const [posts, total] = await Promise.all([
+    this.prisma.post.findMany({
+      where: whereCondition as any,
+      select: {
+        id: true,
+        title: true,
+        excerpt: true,
+        previewImage: true,
+        slug: true,
+        viewCount: true,
+        likeCount: true,
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+      skip,
+      take: limit,
+      orderBy,
+    }),
+    this.prisma.post.count({
+      where: whereCondition as any,
+    }),
+  ]);
+
+  return {
+    items: posts.map((p) => ({
+      id: p.id,
+      title: p.title,
+      excerpt: p.excerpt,
+      previewImage: p.previewImage,
+      slug: p.slug,
+      viewCount: p.viewCount,
+      likeCount: p.likeCount,
+      author: p.user,
+    })),
+    total,
+  };
+}
   // ============================================
   // 자동완성
   // ============================================

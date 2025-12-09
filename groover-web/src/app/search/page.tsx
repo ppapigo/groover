@@ -37,16 +37,13 @@ export default function SearchPage() {
     return () => clearTimeout(debounce);
   }, [query]);
 
-  const handleSearch = async () => {
+ const handleSearch = async () => {
   if (!query.trim()) return;
 
   setIsLoading(true);
   try {
-    // # 기호 제거
-    const searchQuery = query.trim().replace(/^#/, '');
-    
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(searchQuery)}`
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query.trim())}`
     );
     const data = await res.json();
     if (data.posts) {
