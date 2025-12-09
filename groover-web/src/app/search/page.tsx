@@ -38,28 +38,30 @@ export default function SearchPage() {
   }, [query]);
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+  if (!query.trim()) return;
 
-    setIsLoading(true);
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query)}`
-      );
-      const data = await res.json();
-     if (data.posts) {
-          setResults(data.posts);
-        } else if (data.data?.posts) {
-          setResults(data.data.posts);
-        } else {
-          setResults([]);
-        }
-    } catch (err) {
-      console.error('검색 실패:', err);
-    } finally {
-      setIsLoading(false);
+  setIsLoading(true);
+  try {
+    // # 기호 제거
+    const searchQuery = query.trim().replace(/^#/, '');
+    
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(searchQuery)}`
+    );
+    const data = await res.json();
+    if (data.posts) {
+      setResults(data.posts);
+    } else if (data.data?.posts) {
+      setResults(data.data.posts);
+    } else {
+      setResults([]);
     }
-  };
-
+  } catch (err) {
+    console.error('검색 실패:', err);
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <>
       <AppHeader />
