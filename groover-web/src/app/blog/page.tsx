@@ -88,7 +88,7 @@ export default function BlogPage() {
         <div className="post-list">
           {(posts || []).map((post, index) => (
             <div key={post.id}>
-              <Link href={`/blog/${post.id}`} className="post-card">
+              <Link href={`/blog/${post.slug}`} className="post-card">
                 <img
                   className="post-thumb"
                   src={post.thumbnail || 'https://via.placeholder.com/300x200?text=No+Image'}

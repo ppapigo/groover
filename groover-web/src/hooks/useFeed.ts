@@ -22,6 +22,7 @@ interface Post {
   commentCount: number;
   publishedAt: string;
   createdAt: string;
+  slug: string;
 }
 
 interface FeedResponse {
