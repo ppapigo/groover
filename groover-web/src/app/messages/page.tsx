@@ -27,9 +27,23 @@ export default function MessagesPage() {
  const fetchConversations = async () => {
   try {
     const res = await api.get('/dm/threads');
-    const data = res.data.data || res.data || [];
-    setConversations(Array.isArray(data) ? data : []);
-  } catch {
+    const items = res.data?.data?.items || res.data?.items || [];
+    
+    // API 응답을 프론트엔드 형식으로 변환
+    const formatted = items.map((item: any) => ({
+      id: item.id,
+      participant: item.partner,  // partner → participant
+      lastMessage: {
+        content: item.lastMessage || '',  // string → object
+        createdAt: item.lastMessageAt || item.createdAt,
+        isRead: item.unreadCount === 0,
+      },
+      unreadCount: item.unreadCount || 0,
+    }));
+    
+    setConversations(formatted);
+  } catch (err) {
+    console.error('대화 목록 불러오기 실패:', err);
     setConversations([]);
   } finally { 
     setIsLoading(false); 
