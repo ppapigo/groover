@@ -17,6 +17,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notification/notification.module';
 import { SearchModule } from './search/search.module';
+import { UsersModule } from './users/users.module';
+
 
 @Module({
   imports: [
@@ -55,6 +57,7 @@ import { SearchModule } from './search/search.module';
     AdminModule,
     NotificationModule,
     SearchModule,
+    UsersModule,
   ],
   providers: [
     {
