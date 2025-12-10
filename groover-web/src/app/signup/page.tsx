@@ -15,17 +15,23 @@ export default function SignupPage() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [userId, setUserId] = useState('');
 
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const isFormValid = 
-    isValidEmail(email) && 
-    name.trim().length > 0 && 
-    password.length >= 6 && 
-    password === passwordConfirm && 
-    agreeTerms;
+  const isValidUserId = (userId: string) => {
+  return /^[a-zA-Z0-9_]{4,20}$/.test(userId);
+};
+
+const isFormValid = 
+  isValidUserId(userId) &&
+  isValidEmail(email) && 
+  name.trim().length > 0 && 
+  password.length >= 6 && 
+  password === passwordConfirm && 
+  agreeTerms;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,9 +40,10 @@ export default function SignupPage() {
 
     setIsLoading(true);
     setError('');
+    
 
     try {
-      await api.post('/auth/register', { email, password, name });
+      await api.post('/auth/register', { userId, email, password, name });
       // 이메일 인증 대기 페이지로 이동
       router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
@@ -114,7 +121,39 @@ export default function SignupPage() {
             {error}
           </div>
         )}
-
+        {/* 아이디 */}
+<div style={{ marginBottom: '16px' }}>
+  <label
+    style={{
+      display: 'block',
+      fontSize: '13px',
+      fontWeight: '500',
+      marginBottom: '8px',
+      color: '#333',
+    }}
+  >
+    아이디
+  </label>
+  <input
+    type="text"
+    value={userId}
+    onChange={(e) => setUserId(e.target.value.toLowerCase())}
+    placeholder="영문, 숫자, _ (4~20자)"
+    style={{
+      width: '100%',
+      padding: '14px 16px',
+      border: '1px solid #ddd',
+      borderRadius: '10px',
+      fontSize: '16px',
+      outline: 'none',
+    }}
+        />
+        {userId && !isValidUserId(userId) && (
+          <p style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}>
+            아이디는 영문, 숫자, 언더스코어 4~20자로 입력해주세요.
+          </p>
+        )}
+      </div>
         {/* 이메일 */}
         <div style={{ marginBottom: '16px' }}>
           <label

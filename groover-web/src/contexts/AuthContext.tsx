@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (loginData: { email?: string; userId?: string; password: string }) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -47,14 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 로그인
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { user, accessToken } = response.data.data;
-    
-    setAccessToken(accessToken);
-    setUser(user);
-  }, []);
-
+  // 로그인
+const login = useCallback(async (loginData: { email?: string; userId?: string; password: string }) => {
+  const response = await api.post('/auth/login', loginData);
+  const { user, accessToken } = response.data.data;
+  
+  setAccessToken(accessToken);
+  setUser(user);
+}, []);
   // 회원가입
  // 회원가입 - 이메일 인증 필요
 const register = useCallback(async (email: string, password: string, name: string) => {

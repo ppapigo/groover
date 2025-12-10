@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginId, setLoginId] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -20,12 +21,18 @@ export default function LoginPage() {
   setIsLoading(true);
 
   try {
-    await login(email, password);
+    // 이메일인지 아이디인지 판단
+    const isEmail = loginId.includes('@');
+    const loginData = isEmail 
+      ? { email: loginId, password } 
+      : { userId: loginId, password };
+    
+    await login(loginData);
     router.push('/');
   } catch (err: any) {
     const errorCode = err.response?.data?.code;
     if (errorCode === 'EMAIL_NOT_VERIFIED') {
-      // 이메일 미인증 시 인증 대기 페이지로 이동
+      const email = err.response?.data?.email;
       router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
     } else {
       setError(err.response?.data?.message || '로그인에 실패했습니다.');
@@ -83,7 +90,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* 이메일 */}
+        {/* 아이디/이메일 */}
         <div style={{ marginBottom: '16px' }}>
           <label
             style={{
@@ -94,13 +101,13 @@ export default function LoginPage() {
               color: '#333',
             }}
           >
-            이메일
+            아이디 또는 이메일
           </label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="example@email.com"
+            type="text"
+            value={loginId}
+            onChange={(e) => setLoginId(e.target.value)}
+            placeholder="아이디 또는 이메일"
             style={{
               width: '100%',
               padding: '14px 16px',
@@ -144,7 +151,7 @@ export default function LoginPage() {
         {/* 로그인 버튼 */}
         <button
           type="submit"
-          disabled={isLoading || !email || !password}
+         disabled={isLoading || !loginId || !password}
           style={{
             width: '100%',
             padding: '16px',
