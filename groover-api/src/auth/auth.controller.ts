@@ -3,70 +3,57 @@ import {
   Controller,
   Post,
   Body,
-  HttpCode,
-  HttpStatus,
+  Get,
+  Query,
   UseGuards,
   Request,
-  Get,
   Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  /**
-   * 회원가입
-   * POST /v1/auth/register
-   */
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @HttpCode(HttpStatus.CREATED)
-  async register(
-    @Body() dto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.register(dto);
-    
-    // Refresh Token을 HttpOnly 쿠키로 설정
-    this.setRefreshTokenCookie(res, result.refreshToken);
-
+  async register(@Body() registerDto: RegisterDto) {
+    const result = await this.authService.register(registerDto);
     return {
       success: true,
-      message: 'Registration successful',
-      data: {
-        user: result.user,
-        accessToken: result.accessToken,
-      },
+      data: result,
     };
   }
 
-  /**
-   * 로그인
-   * POST /v1/auth/login
-   */
   @Post('login')
-  @Throttle({ default: { limit: 3, ttl: 10000 } })
   @HttpCode(HttpStatus.OK)
   async login(
-    @Body() dto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.login(dto);
-    
+    const result = await this.authService.login(loginDto);
+
     // Refresh Token을 HttpOnly 쿠키로 설정
-    this.setRefreshTokenCookie(res, result.refreshToken);
+    response.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+      path: '/',
+    });
 
     return {
       success: true,
-      message: 'Login successful',
       data: {
         user: result.user,
         accessToken: result.accessToken,
@@ -74,30 +61,75 @@ export class AuthController {
     };
   }
 
-  /**
-   * 토큰 갱신
-   * POST /v1/auth/refresh
-   */
+  // ========================================
+  // 이메일 인증
+  // ========================================
+
+  @Get('verify')
+  async verifyEmail(
+    @Query('token') token: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.verifyEmail(token);
+
+    // 자동 로그인을 위한 쿠키 설정
+    response.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    return {
+      success: true,
+      data: {
+        message: result.message,
+        user: result.user,
+        accessToken: result.accessToken,
+      },
+    };
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body('email') email: string) {
+    const result = await this.authService.resendVerificationEmail(email);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  // ========================================
+  // 토큰 관리
+  // ========================================
+
   @Post('refresh')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async refresh(
+    @Body('refreshToken') bodyToken: string,
     @Request() req,
-    @Res({ passthrough: true }) res: Response,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    const refreshToken = req.cookies?.refreshToken;
-    
+    const refreshToken = bodyToken || req.cookies?.refreshToken;
+
     if (!refreshToken) {
       return {
         success: false,
-        message: 'Refresh token not found',
+        message: 'Refresh token is required',
       };
     }
 
     const tokens = await this.authService.refresh(refreshToken);
-    
-    // 새 Refresh Token 쿠키 설정
-    this.setRefreshTokenCookie(res, tokens.refreshToken);
+
+    response.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
 
     return {
       success: true,
@@ -107,29 +139,20 @@ export class AuthController {
     };
   }
 
-  /**
-   * 로그아웃
-   * POST /v1/auth/logout
-   */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
+    @Body('refreshToken') bodyToken: string,
     @Request() req,
-    @Res({ passthrough: true }) res: Response,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    const refreshToken = req.cookies?.refreshToken;
-    
+    const refreshToken = bodyToken || req.cookies?.refreshToken;
+
     if (refreshToken) {
       await this.authService.logout(refreshToken);
     }
 
-    // 쿠키 삭제
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    response.clearCookie('refreshToken', { path: '/' });
 
     return {
       success: true,
@@ -137,26 +160,13 @@ export class AuthController {
     };
   }
 
-  /**
-   * 모든 기기에서 로그아웃
-   * POST /v1/auth/logout-all
-   */
   @Post('logout-all')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logoutAll(
-    @Request() req,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logoutAll(@Request() req, @Res({ passthrough: true }) response: Response) {
     await this.authService.logoutAll(req.user.id);
 
-    // 쿠키 삭제
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    response.clearCookie('refreshToken', { path: '/' });
 
     return {
       success: true,
@@ -164,80 +174,56 @@ export class AuthController {
     };
   }
 
-  /**
-   * 내 정보 조회
-   * GET /v1/auth/me
-   */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @SkipThrottle()
   async getMe(@Request() req) {
+    const user = await this.authService.validateUser(req.user.id);
     return {
       success: true,
-      data: req.user,
+      data: user,
     };
   }
 
-  /**
-   * 비밀번호 재설정 요청
-   * POST /v1/auth/forgot-password
-   */
+  // ========================================
+  // 비밀번호 재설정 (추후 구현)
+  // ========================================
+
   @Post('forgot-password')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body('email') email: string) {
+    // TODO: 비밀번호 재설정 이메일 발송
     return {
       success: true,
-      message: 'If the email exists, a reset link will be sent',
+      message: '비밀번호 재설정 메일이 발송되었습니다.',
     };
   }
+
   // ========================================
   // Google OAuth
   // ========================================
 
-  /**
-   * Google 로그인 시작
-   * GET /v1/auth/google
-   */
   @Get('google')
-  @UseGuards(GoogleAuthGuard)
+ @UseGuards(GoogleAuthGuard)
   async googleAuth() {
-    // GoogleAuthGuard가 Google로 리다이렉트
+    // Google로 리다이렉트됨
   }
 
-  /**
-   * Google 로그인 콜백
-   * GET /v1/auth/google/callback
-   */
   @Get('google/callback')
-  @UseGuards(GoogleAuthGuard)
-  async googleAuthCallback(
-    @Request() req,
-    @Res() res: Response,
-  ) {
+ @UseGuards(GoogleAuthGuard)
+  async googleCallback(@Request() req, @Res() response: Response) {
     const result = await this.authService.googleLogin(req.user);
-    
-    res.cookie('refreshToken', result.refreshToken, {
+
+    response.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    res.redirect(`${frontendUrl}/auth/callback?token=${result.accessToken}`);
-  }
-  /**
-   * Refresh Token 쿠키 설정 헬퍼
-   */
-  private setRefreshTokenCookie(res: Response, token: string) {
-    res.cookie('refreshToken', token, {
-      httpOnly: true,                                    // JS 접근 불가
-      secure: process.env.NODE_ENV === 'production',    // HTTPS만
-      sameSite: 'strict',                               // CSRF 방지
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000,                  // 7일
-    });
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
+    response.redirect(
+      `${frontendUrl}/auth/callback?token=${result.accessToken}`,
+    );
   }
 }

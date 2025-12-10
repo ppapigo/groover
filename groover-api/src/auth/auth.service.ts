@@ -1,11 +1,15 @@
+// src/auth/auth.service.ts
 import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
@@ -15,11 +19,13 @@ import { LoginDto } from './dto/login.dto';
 export class AuthService {
   private readonly accessTokenExpiry = '15m';
   private readonly refreshTokenExpiry = 7 * 24 * 60 * 60 * 1000; // 7일
+  private readonly verificationTokenExpiry = 24 * 60 * 60 * 1000; // 24시간
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -40,18 +46,21 @@ export class AuthService {
         email,
         passwordHash,
         name,
+        isVerified: false, // 이메일 인증 전
       },
     });
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    // 인증 토큰 생성 및 이메일 발송
+    await this.sendVerificationEmail(user.id, user.email, user.name);
 
     return {
+      message: '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.',
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        isVerified: user.isVerified,
       },
-      ...tokens,
     };
   }
 
@@ -66,10 +75,31 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    // 비밀번호 확인 (Google 로그인 유저는 제외)
+    if (user.passwordHash) {
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+    } else {
+      throw new UnauthorizedException('Please login with Google');
+    }
 
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+    // 이메일 인증 확인
+    if (!user.isVerified) {
+      throw new UnauthorizedException({
+        message: '이메일 인증이 필요합니다. 이메일을 확인해주세요.',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: user.email,
+      });
+    }
+
+    // 계정 정지 확인
+    if (user.suspendedUntil && user.suspendedUntil > new Date()) {
+      throw new UnauthorizedException({
+        message: `계정이 정지되었습니다. ${user.suspendedUntil.toLocaleDateString()}까지 로그인할 수 없습니다.`,
+        code: 'ACCOUNT_SUSPENDED',
+      });
     }
 
     const tokens = await this.generateTokens(user.id, user.email);
@@ -79,13 +109,142 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
+        isVerified: user.isVerified,
       },
       ...tokens,
     };
   }
 
+  // ========================================
+  // 이메일 인증
+  // ========================================
+
+  async sendVerificationEmail(userId: string, email: string, name?: string) {
+    // 기존 미사용 토큰 무효화
+    await this.prisma.emailVerificationToken.updateMany({
+      where: {
+        userId,
+        used: false,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    // 새 토큰 생성
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + this.verificationTokenExpiry);
+
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        token,
+        userId,
+        email,
+        expiresAt,
+      },
+    });
+
+    // 이메일 발송
+    const sent = await this.emailService.sendVerificationEmail(email, token, name);
+
+    if (!sent) {
+      throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+
+    return { message: '인증 이메일이 발송되었습니다.' };
+  }
+
+  async verifyEmail(token: string) {
+    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new BadRequestException('유효하지 않은 인증 링크입니다.');
+    }
+
+    if (verificationToken.used) {
+      throw new BadRequestException('이미 사용된 인증 링크입니다.');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      throw new BadRequestException('인증 링크가 만료되었습니다. 새 인증 메일을 요청해주세요.');
+    }
+
+    // 토큰 사용 처리 및 유저 인증 완료
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.update({
+        where: { id: verificationToken.id },
+        data: {
+          used: true,
+          usedAt: new Date(),
+        },
+      }),
+      this.prisma.user.update({
+        where: { id: verificationToken.userId },
+        data: {
+          isVerified: true,
+        },
+      }),
+    ]);
+
+    // 토큰 발급 (자동 로그인)
+    const tokens = await this.generateTokens(
+      verificationToken.user.id,
+      verificationToken.user.email,
+    );
+
+    return {
+      message: '이메일 인증이 완료되었습니다.',
+      user: {
+        id: verificationToken.user.id,
+        email: verificationToken.user.email,
+        name: verificationToken.user.name,
+        isVerified: true,
+      },
+      ...tokens,
+    };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // 보안: 이메일 존재 여부 노출 방지
+      return { message: '해당 이메일로 인증 메일이 발송되었습니다.' };
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestException('이미 인증된 계정입니다.');
+    }
+
+    // 최근 발송 체크 (스팸 방지 - 1분)
+    const recentToken = await this.prisma.emailVerificationToken.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: new Date(Date.now() - 60 * 1000), // 1분 이내
+        },
+      },
+    });
+
+    if (recentToken) {
+      throw new BadRequestException('잠시 후 다시 시도해주세요. (1분 대기)');
+    }
+
+    await this.sendVerificationEmail(user.id, user.email, user.name);
+
+    return { message: '인증 이메일이 발송되었습니다.' };
+  }
+
+  // ========================================
+  // 기존 메서드들
+  // ========================================
+
   async refresh(refreshToken: string) {
-    // Refresh Token 검증
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
       include: { user: true },
@@ -96,7 +255,6 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      // 만료된 토큰 삭제
       await this.prisma.refreshToken.delete({
         where: { id: storedToken.id },
       });
@@ -118,7 +276,6 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    // Refresh Token 삭제
     await this.prisma.refreshToken.deleteMany({
       where: { token: refreshToken },
     });
@@ -127,7 +284,6 @@ export class AuthService {
   }
 
   async logoutAll(userId: string) {
-    // 유저의 모든 Refresh Token 삭제
     await this.prisma.refreshToken.deleteMany({
       where: { userId },
     });
@@ -138,15 +294,12 @@ export class AuthService {
   private async generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
 
-    // Access Token (15분)
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.accessTokenExpiry,
     });
 
-    // Refresh Token (랜덤 문자열)
     const refreshToken = crypto.randomBytes(64).toString('hex');
 
-    // DB에 Refresh Token 저장
     await this.prisma.refreshToken.create({
       data: {
         token: refreshToken,
@@ -179,18 +332,26 @@ export class AuthService {
         email: true,
         name: true,
         profileImageUrl: true,
+        isVerified: true,
       },
     });
   }
 
-  // 만료된 토큰 정리 (스케줄러용)
   async cleanupExpiredTokens() {
     await this.prisma.refreshToken.deleteMany({
       where: {
         expiresAt: { lt: new Date() },
       },
     });
+
+    // 만료된 인증 토큰도 정리
+    await this.prisma.emailVerificationToken.deleteMany({
+      where: {
+        expiresAt: { lt: new Date() },
+      },
+    });
   }
+
   // ========================================
   // Google OAuth
   // ========================================
@@ -203,10 +364,7 @@ export class AuthService {
   }) {
     let user = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { googleId: googleUser.googleId },
-          { email: googleUser.email },
-        ],
+        OR: [{ googleId: googleUser.googleId }, { email: googleUser.email }],
       },
     });
 
@@ -217,6 +375,7 @@ export class AuthService {
           data: {
             googleId: googleUser.googleId,
             profileImageUrl: user.profileImageUrl || googleUser.profileImageUrl,
+            isVerified: true, // Google 로그인은 자동 인증
           },
         });
       }
@@ -228,6 +387,7 @@ export class AuthService {
           googleId: googleUser.googleId,
           profileImageUrl: googleUser.profileImageUrl,
           passwordHash: '',
+          isVerified: true, // Google 로그인은 자동 인증
         },
       });
     }
@@ -240,6 +400,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         profileImageUrl: user.profileImageUrl,
+        isVerified: user.isVerified,
       },
       ...tokens,
     };
