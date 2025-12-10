@@ -19,6 +19,7 @@ import { NotificationModule } from './notification/notification.module';
 import { SearchModule } from './search/search.module';
 import { UsersModule } from './users/users.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { WalletModule } from './wallet/wallet.module';
 
 
 @Module({
@@ -60,6 +61,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
     SearchModule,
     UsersModule,
     RecommendationsModule,
+    WalletModule,
   ],
   providers: [
     {
