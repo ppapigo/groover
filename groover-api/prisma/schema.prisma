@@ -79,7 +79,7 @@ model User {
   isVerified      Boolean   @default(false)
   emailVerificationTokens EmailVerificationToken[]
 
-  
+  postHistories UserPostHistory[]
   @@map("users")
 }
 model Conversation {
@@ -363,6 +363,7 @@ model Post {
 
   shareCount Int @default(0)
   shares     PostShare[]
+  viewHistories UserPostHistory[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -928,7 +929,20 @@ model EscrowLog {
   @@index([dealId])
 }
 
-
+// 유저 글 열람 히스토리 (추천용)
+model UserPostHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String
+  viewedAt  DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
 // 이벤트 로그 (모든 유저 활동 기록)
 model EventLog {
   id        String   @id @default(cuid())

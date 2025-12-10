@@ -151,6 +151,37 @@ export class BlogController {
     };
   }
 
+  /**
+ * 추천 피드 (개인화 알고리즘)
+ * GET /v1/blog/feed/recommended
+ */
+@Get('feed/recommended')
+@UseGuards(OptionalJwtAuthGuard)
+async getRecommendedFeed(@Request() req, @Query() query: FeedQueryDto) {
+  const result = await this.blogService.getRecommendedFeed(query, req.user?.id);
+  return {
+    success: true,
+    data: result,
+  };
+}
+
+/**
+ * 최신 글 피드 (특정 글 이후)
+ * GET /v1/blog/feed/new
+ */
+@Get('feed/new')
+@UseGuards(OptionalJwtAuthGuard)
+async getNewFeed(
+  @Request() req,
+  @Query('after') after?: string,
+  @Query('limit') limit: number = 20,
+) {
+  const result = await this.blogService.getNewFeed(after || null, limit, req.user?.id);
+  return {
+    success: true,
+    data: result,
+  };
+}
   // ========================================
   // 글 상세
   // ========================================
@@ -159,18 +190,28 @@ export class BlogController {
    * 글 상세 조회
    * GET /v1/blog/posts/:slug
    */
-  @Get('posts/:slug')
-  @UseGuards(OptionalJwtAuthGuard)
-  async getPost(
-    @Request() req,
-    @Param('slug') slug: string,
-  ) {
-    const post = await this.blogService.getPostBySlug(slug, req.user?.id);
-    return {
-      success: true,
-      data: post,
-    };
+  /**
+ * 글 상세 조회
+ * GET /v1/blog/posts/:slug
+ */
+@Get('posts/:slug')
+@UseGuards(OptionalJwtAuthGuard)
+async getPost(
+  @Request() req,
+  @Param('slug') slug: string,
+) {
+  const post = await this.blogService.getPostBySlug(slug, req.user?.id);
+  
+  // 로그인 유저면 열람 기록 저장
+  if (req.user?.id) {
+    this.blogService.recordPostView(post.id, req.user.id);
   }
+  
+  return {
+    success: true,
+    data: post,
+  };
+}
 
   /**
    * 연관 글 조회

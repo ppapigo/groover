@@ -708,4 +708,204 @@ export class BlogService {
       shares: post.shareCount,
     };
   }
+
+  // ========================================
+// 추천 피드 알고리즘
+// ========================================
+
+/**
+ * 추천 피드 (개인화 + 점수 기반)
+ */
+async getRecommendedFeed(query: FeedQueryDto, userId?: string) {
+  const { cursor, limit = 20 } = query;
+  
+  // 1. 유저 선호도 분석 (로그인 시)
+  let userPreferences: { tags: string[], categories: string[] } = { tags: [], categories: [] };
+  
+  if (userId) {
+    userPreferences = await this.getUserPreferences(userId);
+  }
+
+  // 2. 기본 조건
+  const where: any = { status: 'PUBLISHED' };
+
+  // 3. 모든 게시글 가져오기 (최근 30일)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  where.publishedAt = { gte: thirtyDaysAgo };
+
+  const posts = await this.prisma.post.findMany({
+    where,
+    take: 200, // 점수 계산용으로 더 많이 가져옴
+    orderBy: { publishedAt: 'desc' },
+    include: {
+      user: { select: { id: true, name: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  // 4. 점수 계산
+  const scoredPosts = posts.map(post => {
+    const score = this.calculatePostScore(post, userPreferences);
+    return { ...post, score };
+  });
+
+  // 5. 점수순 정렬
+  scoredPosts.sort((a, b) => b.score - a.score);
+
+  // 6. 커서 기반 페이지네이션
+  let startIndex = 0;
+  if (cursor) {
+    const cursorIndex = scoredPosts.findIndex(p => p.id === cursor);
+    if (cursorIndex !== -1) {
+      startIndex = cursorIndex + 1;
+    }
+  }
+
+  const items = scoredPosts.slice(startIndex, startIndex + limit);
+  const hasMore = startIndex + limit < scoredPosts.length;
+  const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+  return {
+    items: items.map(post => ({
+      ...this.formatFeedItem(post, userId),
+      score: post.score,
+    })),
+    nextCursor,
+    hasMore,
+  };
+}
+
+/**
+ * 점수 계산 알고리즘
+ * score = a * recency + b * log(views + 1) + c * likes + d * tag_match
+ */
+private calculatePostScore(
+  post: any,
+  userPreferences: { tags: string[], categories: string[] }
+): number {
+  const a = 0.3; // recency 가중치
+  const b = 0.2; // views 가중치
+  const c = 0.3; // likes 가중치
+  const d = 0.2; // tag_match 가중치
+
+  // 1. Recency Score (0~1, 최신일수록 높음)
+  const now = new Date();
+  const publishedAt = new Date(post.publishedAt);
+  const hoursSincePublished = (now.getTime() - publishedAt.getTime()) / (1000 * 60 * 60);
+  const recencyScore = Math.max(0, 1 - (hoursSincePublished / (24 * 30))); // 30일 기준
+
+  // 2. View Score (로그 스케일)
+  const viewScore = Math.log10(post.viewCount + 1) / 5; // 정규화
+
+  // 3. Like Score
+  const likeScore = Math.min(1, (post.likeCount || post._count?.likes || 0) / 100);
+
+  // 4. Tag Match Score (유저 선호 태그와 매칭)
+  let tagMatchScore = 0;
+  if (userPreferences.tags.length > 0 && post.tags?.length > 0) {
+    const matchCount = post.tags.filter((tag: string) => 
+      userPreferences.tags.includes(tag)
+    ).length;
+    tagMatchScore = matchCount / Math.max(post.tags.length, userPreferences.tags.length);
+  }
+
+  // 최종 점수
+  const score = (a * recencyScore) + (b * viewScore) + (c * likeScore) + (d * tagMatchScore);
+  
+  return Math.round(score * 1000) / 1000; // 소수점 3자리
+}
+
+/**
+ * 유저 선호도 분석
+ */
+private async getUserPreferences(userId: string): Promise<{ tags: string[], categories: string[] }> {
+  // 최근 본 글 50개에서 태그 추출
+  const recentViews = await this.prisma.userPostHistory.findMany({
+    where: { userId },
+    orderBy: { viewedAt: 'desc' },
+    take: 50,
+    include: {
+      post: {
+        select: { tags: true },
+      },
+    },
+  });
+
+  // 태그 빈도 계산
+  const tagCounts: Record<string, number> = {};
+  recentViews.forEach(view => {
+    view.post.tags?.forEach((tag: string) => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    });
+  });
+
+  // 상위 10개 태그
+  const topTags = Object.entries(tagCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 10)
+    .map(([tag]) => tag);
+
+  return {
+    tags: topTags,
+    categories: [], // 추후 확장
+  };
+}
+
+/**
+ * 글 열람 기록 저장
+ */
+async recordPostView(postId: string, userId: string) {
+  try {
+    await this.prisma.userPostHistory.upsert({
+      where: {
+        userId_postId: { userId, postId },
+      },
+      update: {
+        viewedAt: new Date(),
+      },
+      create: {
+        userId,
+        postId,
+      },
+    });
+  } catch (error) {
+    // 에러 무시 (기록 실패해도 서비스 영향 없음)
+    this.logger.warn(`Failed to record post view: ${error}`);
+  }
+}
+
+/**
+ * 최신 글 피드 (after 기준)
+ */
+async getNewFeed(afterId: string | null, limit: number = 20, userId?: string) {
+  const where: any = { status: 'PUBLISHED' };
+  
+  if (afterId) {
+    const afterPost = await this.prisma.post.findUnique({
+      where: { id: afterId },
+      select: { publishedAt: true },
+    });
+    
+    if (afterPost?.publishedAt) {
+      where.publishedAt = { gt: afterPost.publishedAt };
+    }
+  }
+
+  const posts = await this.prisma.post.findMany({
+    where,
+    take: limit,
+    orderBy: { publishedAt: 'desc' },
+    include: {
+      user: { select: { id: true, name: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  return {
+    items: posts.map(post => this.formatFeedItem(post, userId)),
+    count: posts.length,
+  };
+}
 }
