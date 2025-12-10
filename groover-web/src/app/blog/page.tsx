@@ -112,9 +112,9 @@ export default function BlogPage() {
         {/* 포스트 리스트 */}
         <div className="post-list">
           {(posts || []).map((post, index) => (
-            <div key={post.id}>
-              {/* slug 대신 id 사용 */}
-              <Link href={`/blog/${post.id}`} className="post-card">
+            <div key={post.slug}>
+              {/* slug 사용 */}
+              <Link href={`/blog/${post.slug}`} className="post-card">
                 {post.previewImage && (
                   <img
                     className="post-thumb"
