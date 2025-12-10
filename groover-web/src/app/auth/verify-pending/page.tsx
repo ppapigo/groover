@@ -1,11 +1,11 @@
 // src/app/auth/verify-pending/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 
-export default function VerifyPendingPage() {
+function VerifyPendingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -148,5 +148,13 @@ export default function VerifyPendingPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPendingPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>로딩 중...</div>}>
+      <VerifyPendingContent />
+    </Suspense>
   );
 }

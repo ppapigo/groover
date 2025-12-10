@@ -1,12 +1,13 @@
 // src/app/auth/verify/page.tsx
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { setAccessToken } from '@/lib/api';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -35,7 +36,6 @@ export default function VerifyEmailPage() {
       setStatus('success');
       setMessage('이메일 인증이 완료되었습니다!');
 
-      // 3초 후 홈으로 이동
       setTimeout(() => {
         router.push('/');
       }, 3000);
@@ -155,17 +155,14 @@ export default function VerifyEmailPage() {
           </>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>로딩 중...</div>}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
