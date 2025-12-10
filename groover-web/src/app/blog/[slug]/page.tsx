@@ -1,4 +1,4 @@
-// src/app/blog/[id]/page.tsx
+// src/app/blog/[slug]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,7 +20,7 @@ interface Post {
   author: {
     id: string;
     name: string;
-    profileImage?: string;
+    profileImageUrl?: string;
   };
 }
 
@@ -94,7 +94,7 @@ const MarkdownContent = ({ content, showAd = false, adSlot }: { content: string;
   );
 };
 
-export default function BlogDetailPage({ params }: { params: { id: string } }) {
+export default function BlogDetailPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
@@ -103,12 +103,12 @@ export default function BlogDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchPost();
-  }, [params.id]);
+  }, [params.slug]);
 
   const fetchPost = async () => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${params.id}`
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${params.slug}`
       );
       const data = await res.json();
       if (data.success) {
@@ -126,19 +126,19 @@ export default function BlogDetailPage({ params }: { params: { id: string } }) {
       router.push('/login');
       return;
     }
+    if (!post) return;
+    
     try {
       const token = localStorage.getItem('accessToken');
       await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${params.id}/like`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${post.id}/like`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       setIsLiked(!isLiked);
-      if (post) {
-        setPost({ ...post, likeCount: post.likeCount + (isLiked ? -1 : 1) });
-      }
+      setPost({ ...post, likeCount: post.likeCount + (isLiked ? -1 : 1) });
     } catch (err) {
       console.error('좋아요 실패:', err);
     }
@@ -214,9 +214,9 @@ export default function BlogDetailPage({ params }: { params: { id: string } }) {
               justifyContent: 'center',
               overflow: 'hidden',
             }}>
-              {post.author.profileImage ? (
+              {post.author.profileImageUrl ? (
                 <img 
-                  src={post.author.profileImage} 
+                  src={post.author.profileImageUrl} 
                   alt={post.author.name}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                 />
