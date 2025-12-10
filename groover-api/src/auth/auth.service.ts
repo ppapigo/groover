@@ -29,91 +29,108 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, name } = registerDto;
+  const { userId, email, password, name } = registerDto;
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+  // userId 중복 체크
+  const existingUserId = await this.prisma.user.findUnique({
+    where: { userId },
+  });
 
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        isVerified: false, // 이메일 인증 전
-      },
-    });
-
-    // 인증 토큰 생성 및 이메일 발송
-    await this.sendVerificationEmail(user.id, user.email, user.name);
-
-    return {
-      message: '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        isVerified: user.isVerified,
-      },
-    };
+  if (existingUserId) {
+    throw new ConflictException('이미 사용 중인 아이디입니다.');
   }
+
+  // email 중복 체크
+  const existingEmail = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingEmail) {
+    throw new ConflictException('이미 사용 중인 이메일입니다.');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await this.prisma.user.create({
+    data: {
+      userId,
+      email,
+      passwordHash,
+      name: name || userId,
+      isVerified: false,
+    },
+  });
+
+  // 인증 토큰 생성 및 이메일 발송
+  await this.sendVerificationEmail(user.id, user.email, user.name);
+
+  return {
+    message: '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.',
+    user: {
+      id: user.id,
+      userId: user.userId,
+      email: user.email,
+      name: user.name,
+      isVerified: user.isVerified,
+    },
+  };
+}
 
   async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+  const { email, userId, password } = loginDto;
 
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // 비밀번호 확인 (Google 로그인 유저는 제외)
-    if (user.passwordHash) {
-      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-      if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
-    } else {
-      throw new UnauthorizedException('Please login with Google');
-    }
-
-    // 이메일 인증 확인
-    if (!user.isVerified) {
-      throw new UnauthorizedException({
-        message: '이메일 인증이 필요합니다. 이메일을 확인해주세요.',
-        code: 'EMAIL_NOT_VERIFIED',
-        email: user.email,
-      });
-    }
-
-    // 계정 정지 확인
-    if (user.suspendedUntil && user.suspendedUntil > new Date()) {
-      throw new UnauthorizedException({
-        message: `계정이 정지되었습니다. ${user.suspendedUntil.toLocaleDateString()}까지 로그인할 수 없습니다.`,
-        code: 'ACCOUNT_SUSPENDED',
-      });
-    }
-
-    const tokens = await this.generateTokens(user.id, user.email);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        isVerified: user.isVerified,
-      },
-      ...tokens,
-    };
+  if (!email && !userId) {
+    throw new BadRequestException('이메일 또는 아이디를 입력해주세요.');
   }
+
+  const user = await this.prisma.user.findFirst({
+    where: email ? { email } : { userId },
+  });
+
+  if (!user) {
+    throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
+  }
+
+  // 비밀번호 확인
+  if (user.passwordHash) {
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
+    }
+  } else {
+    throw new UnauthorizedException('Google 로그인을 이용해주세요.');
+  }
+
+  // 이메일 인증 확인
+  if (!user.isVerified) {
+    throw new UnauthorizedException({
+      message: '이메일 인증이 필요합니다. 이메일을 확인해주세요.',
+      code: 'EMAIL_NOT_VERIFIED',
+      email: user.email,
+    });
+  }
+
+  // 계정 정지 확인
+  if (user.suspendedUntil && user.suspendedUntil > new Date()) {
+    throw new UnauthorizedException({
+      message: `계정이 정지되었습니다. ${user.suspendedUntil.toLocaleDateString()}까지 로그인할 수 없습니다.`,
+      code: 'ACCOUNT_SUSPENDED',
+    });
+  }
+
+  const tokens = await this.generateTokens(user.id, user.email);
+
+  return {
+    user: {
+      id: user.id,
+      userId: user.userId,
+      email: user.email,
+      name: user.name,
+      isVerified: user.isVerified,
+    },
+    ...tokens,
+  };
+}
 
   // ========================================
   // 이메일 인증
