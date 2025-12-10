@@ -32,7 +32,7 @@ export default function BlogPage() {
     <>
       <AppHeader />
       <div className="blog-page">
-        {/* 헤더 + 글쓰기 버튼 */}
+        {/* 헤더 + 버튼들 */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -40,25 +40,45 @@ export default function BlogPage() {
           marginBottom: '16px'
         }}>
           <h2 style={{ margin: 0 }}>오늘의 쇼핑 리뷰</h2>
-          <Link 
-            href="/write" 
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: '#0f62fe',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '24px',
-              textDecoration: 'none',
-              fontWeight: '300',
-              lineHeight: 1,
-            }}
-          >
-            +
-          </Link>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={() => fetchPosts(null)}
+              disabled={isLoading}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: '#f5f5f5',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              🔄
+            </button>
+            <Link 
+              href="/write" 
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: '#0f62fe',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                textDecoration: 'none',
+                fontWeight: '300',
+                lineHeight: 1,
+              }}
+            >
+              +
+            </Link>
+          </div>
         </div>
 
         {/* 상단 광고 배너 */}
