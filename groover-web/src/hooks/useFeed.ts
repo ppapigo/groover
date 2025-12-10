@@ -1,4 +1,4 @@
-// C:\dev\groover\groover-web\src\hooks\useFeed.ts
+// src/hooks/useFeed.ts
 'use client';
 
 import { useState, useCallback } from 'react';
@@ -24,6 +24,7 @@ interface Post {
   publishedAt: string;
   createdAt: string;
   slug: string;
+  score?: number;
 }
 
 interface FeedResponse {
@@ -36,10 +37,11 @@ interface UseFeedOptions {
   category?: string;
   tag?: string;
   limit?: number;
+  feedType?: 'latest' | 'recommended' | 'popular';
 }
 
 export function useFeed(options: UseFeedOptions = {}) {
-  const { category, tag, limit = 10 } = options;
+  const { category, tag, limit = 10, feedType = 'recommended' } = options;
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -55,14 +57,28 @@ export function useFeed(options: UseFeedOptions = {}) {
       const params = new URLSearchParams();
       params.append('limit', limit.toString());
       if (cursor) params.append('cursor', cursor);
-      if (category && category !== '전체') params.append('category', category);
-      if (tag) params.append('tag', tag);
 
-     const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/feed?${params}`,
+      // 피드 타입에 따라 엔드포인트 결정
+      let endpoint = '/blog/feed';
+      
+      if (category && category !== '전체') {
+        endpoint = `/blog/feed/tag/${encodeURIComponent(category)}`;
+      } else if (tag) {
+        endpoint = `/blog/feed/tag/${encodeURIComponent(tag)}`;
+      } else if (feedType === 'recommended') {
+        endpoint = '/blog/feed/recommended';
+      } else if (feedType === 'popular') {
+        endpoint = '/blog/feed/popular';
+      }
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}${endpoint}?${params}`,
         {
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
           },
         }
       );
@@ -72,7 +88,7 @@ export function useFeed(options: UseFeedOptions = {}) {
       }
 
       const result = await response.json();
-      const data: FeedResponse = result.data;  // data.data에서 꺼내기
+      const data: FeedResponse = result.data;
 
       if (cursor) {
         setPosts(prev => [...prev, ...data.items]);
@@ -87,7 +103,7 @@ export function useFeed(options: UseFeedOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [category, tag, limit]);
+  }, [category, tag, limit, feedType]);
 
   const loadMore = useCallback(() => {
     if (!isLoading && hasMore && nextCursor) {
