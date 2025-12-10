@@ -4,11 +4,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import api from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register } = useAuth();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -37,8 +36,9 @@ export default function SignupPage() {
     setError('');
 
     try {
-      await register(email, password, name);
-      router.push('/');
+      await api.post('/auth/register', { email, password, name });
+      // 이메일 인증 대기 페이지로 이동
+      router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setError(err.response?.data?.message || '회원가입에 실패했습니다.');
     } finally {
@@ -298,7 +298,7 @@ export default function SignupPage() {
             cursor: isFormValid ? 'pointer' : 'not-allowed',
           }}
         >
-          {isLoading ? '가입 중...' : '가입 완료'}
+          {isLoading ? '가입 중...' : '가입하기'}
         </button>
 
         {/* 구분선 */}

@@ -56,14 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 회원가입
-  const register = useCallback(async (email: string, password: string, name: string) => {
-    const response = await api.post('/auth/register', { email, password, name });
-    const { user, accessToken } = response.data.data;
-    
-    setAccessToken(accessToken);
-    setUser(user);
-  }, []);
-
+ // 회원가입 - 이메일 인증 필요
+const register = useCallback(async (email: string, password: string, name: string) => {
+  const response = await api.post('/auth/register', { email, password, name });
+  // 이메일 인증 전이므로 토큰 저장 안 함
+  return response.data;
+}, []);
   // 로그아웃
   const logout = useCallback(async () => {
     try {

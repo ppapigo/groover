@@ -15,19 +15,25 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+  e.preventDefault();
+  setError('');
+  setIsLoading(true);
 
-    try {
-      await login(email, password);
-      router.push('/');
-    } catch (err: any) {
+  try {
+    await login(email, password);
+    router.push('/');
+  } catch (err: any) {
+    const errorCode = err.response?.data?.code;
+    if (errorCode === 'EMAIL_NOT_VERIFIED') {
+      // 이메일 미인증 시 인증 대기 페이지로 이동
+      router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
+    } else {
       setError(err.response?.data?.message || '로그인에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleGoogleLogin = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1';
