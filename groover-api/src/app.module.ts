@@ -18,6 +18,7 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notification/notification.module';
 import { SearchModule } from './search/search.module';
 import { UsersModule } from './users/users.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
 
 
 @Module({
@@ -58,6 +59,7 @@ import { UsersModule } from './users/users.module';
     NotificationModule,
     SearchModule,
     UsersModule,
+    RecommendationsModule,
   ],
   providers: [
     {
