@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { InArticleAd, BannerAd } from '@/components/ad/AdBanner';
 
@@ -24,44 +23,55 @@ interface Post {
   };
 }
 
-// 광고 슬롯 ID (AdSense에서 광고 단위 생성 후 교체 필요)
 const AD_SLOTS = {
   IN_ARTICLE: '4567890123',
   BOTTOM: '5678901234',
 };
 
-// 마크다운 이미지를 포함한 콘텐츠를 렌더링하는 컴포넌트
-const MarkdownContent = ({ content, showAd = false, adSlot }: { content: string; showAd?: boolean; adSlot?: string }) => {
+// 시간 포맷팅
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ko-KR', { 
+    year: 'numeric',
+    month: 'long', 
+    day: 'numeric' 
+  });
+}
+
+// 마크다운 콘텐츠 렌더러
+function MarkdownContent({ 
+  content, 
+  showAd = false, 
+  adSlot 
+}: { 
+  content: string; 
+  showAd?: boolean; 
+  adSlot?: string;
+}) {
   if (!content) return null;
 
   const parts = content.split(/(!\[[^\]]*\]\([^)]+\))/g);
-  
   let paragraphCount = 0;
   let adShown = false;
 
   return (
-    <>
+    <div className="space-y-4">
       {parts.map((part, index) => {
         const imageMatch = part.match(/!\[([^\]]*)\]\(([^)]+)\)/);
         
         if (imageMatch) {
           const [, alt, url] = imageMatch;
           return (
-            <img
-              key={index}
-              src={url}
-              alt={alt || '이미지'}
-              style={{
-                maxWidth: '100%',
-                height: 'auto',
-                borderRadius: '8px',
-                margin: '16px 0',
-                display: 'block',
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            <div key={index} className="relative -mx-5 md:mx-0 md:rounded-xl overflow-hidden">
+              <img
+                src={url}
+                alt={alt || '이미지'}
+                className="w-full h-auto"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
           );
         }
 
@@ -77,10 +87,14 @@ const MarkdownContent = ({ content, showAd = false, adSlot }: { content: string;
                 
                 return (
                   <div key={lineIndex}>
-                    <p style={{ margin: '8px 0', minHeight: '1.5em' }}>
+                    <p className="text-base leading-relaxed text-text-primary">
                       {line || '\u00A0'}
                     </p>
-                    {shouldShowAd && <InArticleAd slot={adSlot!} />}
+                    {shouldShowAd && (
+                      <div className="my-6">
+                        <InArticleAd slot={adSlot!} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -90,9 +104,33 @@ const MarkdownContent = ({ content, showAd = false, adSlot }: { content: string;
 
         return null;
       })}
-    </>
+    </div>
   );
-};
+}
+
+// 로딩 스켈레톤
+function DetailSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-64 bg-card-soft" />
+      <div className="px-5 py-6 space-y-4">
+        <div className="h-8 bg-card-soft rounded w-3/4" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-card-soft rounded-full" />
+          <div className="space-y-2">
+            <div className="h-4 bg-card-soft rounded w-24" />
+            <div className="h-3 bg-card-soft rounded w-16" />
+          </div>
+        </div>
+        <div className="space-y-3 pt-4">
+          <div className="h-4 bg-card-soft rounded w-full" />
+          <div className="h-4 bg-card-soft rounded w-full" />
+          <div className="h-4 bg-card-soft rounded w-2/3" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BlogDetailPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
@@ -144,24 +182,65 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
     }
   };
 
+  const handleDelete = async () => {
+    if (!post) return;
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${post.id}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      alert('삭제되었습니다.');
+      router.push('/blog');
+    } catch (err) {
+      alert('삭제에 실패했습니다.');
+    }
+  };
+
+  // 로딩 상태
   if (isLoading) {
     return (
-      <>
-        <AppHeader />
-        <div style={{ padding: '40px', textAlign: 'center' }}>로딩 중...</div>
-      </>
+      <div className="min-h-screen bg-white">
+        <header className="sticky top-0 z-20 bg-white border-b border-border">
+          <div className="flex items-center h-14 px-4">
+            <button onClick={() => router.back()} className="p-2 -ml-2">
+              <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
+        </header>
+        <DetailSkeleton />
+      </div>
     );
   }
 
+  // 글 없음
   if (!post) {
     return (
-      <>
-        <AppHeader />
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-          <p>글을 찾을 수 없습니다.</p>
-          <Link href="/blog" style={{ color: '#0f62fe' }}>목록으로 돌아가기</Link>
+      <div className="min-h-screen bg-white">
+        <header className="sticky top-0 z-20 bg-white border-b border-border">
+          <div className="flex items-center h-14 px-4">
+            <button onClick={() => router.back()} className="p-2 -ml-2">
+              <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div className="empty-state">
+          <div className="empty-state-icon">😢</div>
+          <p className="empty-state-text mb-4">글을 찾을 수 없습니다</p>
+          <Link href="/blog" className="btn-primary">
+            목록으로 돌아가기
+          </Link>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -169,81 +248,83 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
   const showInArticleAd = post.content.length > 500;
 
   return (
-    <>
-      <AppHeader />
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-        {/* 대표 이미지 */}
-        {post.previewImage && !hasContentImages && (
+    <div className="min-h-screen bg-white pb-24">
+      {/* 헤더 */}
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-lg border-b border-border">
+        <div className="flex items-center justify-between h-14 px-4">
+          <button onClick={() => router.back()} className="p-2 -ml-2">
+            <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          
+          {/* 공유 버튼 */}
+          <button 
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: post.title, url: window.location.href });
+              } else {
+                navigator.clipboard.writeText(window.location.href);
+                alert('링크가 복사되었습니다!');
+              }
+            }}
+            className="p-2 -mr-2"
+          >
+            <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* 대표 이미지 */}
+      {post.previewImage && !hasContentImages && (
+        <div className="relative aspect-video w-full overflow-hidden bg-card-soft">
           <img
             src={post.previewImage}
             alt={post.title}
-            style={{
-              width: '100%',
-              maxHeight: '400px',
-              objectFit: 'cover',
-              borderRadius: '12px',
-              marginBottom: '20px',
-            }}
+            className="w-full h-full object-cover"
           />
-        )}
+        </div>
+      )}
 
+      {/* 콘텐츠 */}
+      <article className="px-5 py-6">
         {/* 제목 */}
-        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '16px' }}>
+        <h1 className="text-2xl font-bold text-text-primary leading-tight mb-5">
           {post.title}
         </h1>
 
         {/* 작성자 정보 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <Link 
-            href={`/profile/${post.author.id}`} 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              textDecoration: 'none', 
-              color: 'inherit' 
-            }}
-          >
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: '#eee',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}>
-              {post.author.profileImageUrl ? (
-                <img 
-                  src={post.author.profileImageUrl} 
-                  alt={post.author.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                />
-              ) : '👤'}
-            </div>
-            <span style={{ fontWeight: '600' }}>{post.author.name}</span>
-          </Link>
-          <span style={{ color: '#999', fontSize: '14px' }}>
-            {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
-          </span>
-        </div>
+        <Link 
+          href={`/profile/${post.author.id}`}
+          className="flex items-center gap-3 mb-5"
+        >
+          <div className="w-11 h-11 rounded-full bg-card-soft overflow-hidden flex items-center justify-center">
+            {post.author.profileImageUrl ? (
+              <img 
+                src={post.author.profileImageUrl} 
+                alt={post.author.name}
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <span className="text-xl">👤</span>
+            )}
+          </div>
+          <div>
+            <p className="font-semibold text-text-primary">{post.author.name}</p>
+            <p className="text-sm text-text-tertiary">{formatDate(post.publishedAt)}</p>
+          </div>
+        </Link>
 
         {/* 태그 */}
         {post.tags && post.tags.length > 0 && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div className="flex flex-wrap gap-2 mb-6">
             {post.tags.map(tag => (
               <Link 
                 key={tag} 
                 href={`/blog?tag=${encodeURIComponent(tag)}`}
-                style={{
-                  padding: '4px 12px',
-                  background: '#e8f4ff',
-                  color: '#0f62fe',
-                  borderRadius: '20px',
-                  fontSize: '14px',
-                  textDecoration: 'none',
-                }}
+                className="px-3 py-1.5 bg-primary-light text-primary text-sm font-medium rounded-chip"
               >
                 #{tag}
               </Link>
@@ -251,8 +332,11 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
           </div>
         )}
 
+        {/* 구분선 */}
+        <div className="divider mb-6" />
+
         {/* 본문 */}
-        <div style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '40px' }}>
+        <div className="prose-groover">
           <MarkdownContent 
             content={post.content} 
             showAd={showInArticleAd} 
@@ -260,106 +344,70 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
           />
         </div>
 
-        {/* 좋아요 / 조회수 */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '20px',
-          padding: '20px 0',
-          borderTop: '1px solid #eee',
-          borderBottom: '1px solid #eee',
-        }}>
-          <button
-            onClick={handleLike}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '16px',
-              color: isLiked ? '#ef4444' : '#666',
-            }}
-          >
-            {isLiked ? '❤️' : '🤍'} {post.likeCount}
-          </button>
-          <span style={{ color: '#999' }}>👁 {post.viewCount}</span>
-        </div>
-
         {/* 하단 광고 */}
-        <BannerAd slot={AD_SLOTS.BOTTOM} position="bottom" />
+        <div className="mt-8">
+          <BannerAd slot={AD_SLOTS.BOTTOM} position="bottom" />
+        </div>
 
         {/* 수정/삭제 버튼 (작성자만) */}
         {user && post.author.id === user.id && (
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
-            marginTop: '20px',
-            paddingBottom: '20px',
-            borderBottom: '1px solid #eee',
-          }}>
+          <div className="flex gap-3 mt-6 pt-6 border-t border-border">
             <Link 
               href={`/write?edit=${post.id}`}
-              style={{
-                padding: '8px 16px',
-                background: '#0f62fe',
-                color: '#fff',
-                borderRadius: '8px',
-                textDecoration: 'none',
-                fontSize: '14px',
-              }}
+              className="btn-primary flex-1 text-center"
             >
               수정하기
             </Link>
             <button
-              onClick={async () => {
-                if (confirm('정말 삭제하시겠습니까?')) {
-                  try {
-                    const token = localStorage.getItem('accessToken');
-                    await fetch(
-                      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${post.id}`,
-                      {
-                        method: 'DELETE',
-                        headers: { Authorization: `Bearer ${token}` },
-                      }
-                    );
-                    alert('삭제되었습니다.');
-                    router.push('/blog');
-                  } catch (err) {
-                    alert('삭제에 실패했습니다.');
-                  }
-                }
-              }}
-              style={{
-                padding: '8px 16px',
-                background: '#ef4444',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                cursor: 'pointer',
-              }}
+              onClick={handleDelete}
+              className="btn-secondary flex-1 text-error"
             >
               삭제하기
             </button>
           </div>
         )}
+      </article>
 
-        {/* 목록으로 */}
-        <div style={{ marginTop: '20px' }}>
-          <Link href="/blog" style={{
-            display: 'inline-block',
-            padding: '12px 24px',
-            background: '#f5f5f5',
-            borderRadius: '8px',
-            textDecoration: 'none',
-            color: '#333',
-          }}>
-            ← 목록으로
+      {/* 하단 고정 바 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border safe-area-pb z-30">
+        <div className="max-w-[480px] mx-auto flex items-center justify-between px-5 py-3">
+          {/* 좋아요 버튼 */}
+          <button
+            onClick={handleLike}
+            className="flex items-center gap-2"
+          >
+            <div className={`
+              w-10 h-10 rounded-full flex items-center justify-center transition-colors
+              ${isLiked ? 'bg-red-50' : 'bg-card-soft'}
+            `}>
+              {isLiked ? (
+                <svg className="w-6 h-6 text-error" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              )}
+            </div>
+            <span className="font-semibold text-text-primary">{post.likeCount}</span>
+          </button>
+
+          {/* 조회수 */}
+          <div className="flex items-center gap-2 text-text-tertiary">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span className="text-sm">{post.viewCount}</span>
+          </div>
+
+          {/* 목록으로 */}
+          <Link href="/blog" className="btn-secondary">
+            목록으로
           </Link>
         </div>
       </div>
-    </>
+    </div>
   );
 }

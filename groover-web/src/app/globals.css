@@ -1,339 +1,296 @@
-/* src/app/globals.css */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================
+   Groover - 당근마켓 스타일 Global Styles
+   ======================================== */
+
+:root {
+  /* Color System */
+  --color-primary: #3B82F6;
+  --color-primary-dark: #1D4ED8;
+  --color-primary-light: #DBEAFE;
+  --color-success: #10B981;
+  --color-warning: #FACC15;
+  --color-error: #EF4444;
+  --color-background: #F9FAFB;
+  --color-card: #FFFFFF;
+  --color-card-soft: #F3F4F6;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #9CA3AF;
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+  
+  /* Spacing */
+  --spacing-page: 20px;
+  --spacing-card: 16px;
+  
+  /* Safe Areas */
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+}
+
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: #fff;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* 전체 레이아웃 */
+/* App Container */
 .app-root {
   min-height: 100vh;
-  max-width: 480px;
-  margin: 0 auto;
-  background: #fff;
   display: flex;
   flex-direction: column;
-  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: var(--color-background);
 }
 
 .app-main {
   flex: 1;
+  padding-bottom: calc(64px + var(--safe-area-bottom));
   overflow-y: auto;
-  padding-bottom: 60px;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* 헤더 - 스크롤 따라오지 않음 */
-.app-header {
-  padding: 16px;
-  border-bottom: 1px solid #eee;
-  background: #fff;
-  position: static;
-}
+/* ========================================
+   Typography
+   ======================================== */
 
-.app-header .logo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 22px;
+h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
+  color: var(--color-text-primary);
 }
 
-.app-header .logo-icon {
-  font-size: 24px;
+/* ========================================
+   Scrollbar
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
-.app-header .subtitle {
-  margin-top: 4px;
-  font-size: 13px;
-  color: #666;
-}
+/* ========================================
+   Links
+   ======================================== */
 
-/* 하단 탭바 */
-.bottom-tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: 56px;
-  background: #fff;
-  border-top: 1px solid #eee;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 100;
-}
-
-.tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  text-decoration: none;
-  color: #999;
-  font-size: 11px;
-  padding: 8px 0;
-  transition: color 0.2s;
-}
-
-.tab-item .tab-icon {
-  font-size: 20px;
-}
-
-.tab-item.active,
-.tab-item:hover {
-  color: #0f62fe;
-}
-
-.tab-item.active .tab-label {
-  font-weight: 600;
-}
-
-/* 챗봇 페이지 */
-.chat-page {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 56px);
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.chat-bubble {
-  max-width: 85%;
-  padding: 12px 16px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.chat-bubble.assistant {
-  background: #f1f3f5;
-  color: #333;
-  align-self: flex-start;
-  border-bottom-left-radius: 4px;
-}
-
-.chat-bubble.user {
-  background: #0f62fe;
-  color: #fff;
-  align-self: flex-end;
-  border-bottom-right-radius: 4px;
-}
-
-.chat-input-bar {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid #eee;
-  background: #fff;
-}
-
-.chat-input-bar textarea {
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid #ddd;
-  border-radius: 20px;
-  font-size: 14px;
-  resize: none;
-  outline: none;
-  font-family: inherit;
-}
-
-.chat-input-bar textarea:focus {
-  border-color: #0f62fe;
-}
-
-.chat-input-bar button {
-  padding: 10px 16px;
-  background: #0f62fe;
-  color: #fff;
-  border: none;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chat-input-bar button:hover {
-  background: #0353e9;
-}
-
-/* 블로그 페이지 */
-.blog-page {
-  padding: 16px;
-}
-
-.blog-page h2 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-/* 카테고리 칩 */
-.category-chips {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-}
-
-.category-chips::-webkit-scrollbar {
-  display: none;
-}
-
-.chip-btn {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  border-radius: 999px;
-  background: #fff;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.chip-btn:hover,
-.chip-btn.active {
-  background: #0f62fe;
-  color: #fff;
-  border-color: #0f62fe;
-}
-
-/* 포스트 리스트 */
-.post-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.post-card {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid #eee;
-  background: #fff;
-  text-decoration: none;
+a {
   color: inherit;
-  transition: box-shadow 0.2s;
+  text-decoration: none;
 }
 
-.post-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+/* ========================================
+   Buttons
+   ======================================== */
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
 }
 
-.post-thumb {
-  width: 120px;
-  height: 90px;
-  object-fit: cover;
-  border-radius: 8px;
-  flex-shrink: 0;
-  background: #f0f0f0;
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-.post-meta {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+/* ========================================
+   Inputs
+   ======================================== */
 
-.post-meta h3 {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  margin-bottom: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.post-meta p {
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin-bottom: auto;
-}
-
-.post-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-  color: #999;
-  margin-top: 8px;
-}
-
-.post-tags {
-  display: flex;
-  gap: 4px;
-}
-
-.post-tag {
-  color: #0f62fe;
-}
-
-/* 검색 페이지 */
-.search-page,
-.profile-page {
-  padding: 16px;
-  text-align: center;
-}
-
-.search-page h2,
-.profile-page h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.search-page p,
-.profile-page p {
-  font-size: 14px;
-  color: #666;
-}
-
-/* 검색 입력 */
-.search-input-wrapper {
-  margin-top: 20px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  font-size: 14px;
+input, textarea {
+  font-family: inherit;
+  font-size: 16px; /* iOS zoom 방지 */
+  border: none;
   outline: none;
+  background: transparent;
 }
 
-.search-input:focus {
-  border-color: #0f62fe;
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-tertiary);
 }
+
+/* ========================================
+   Images
+   ======================================== */
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ========================================
+   Component Utilities
+   ======================================== */
+
+@layer components {
+  /* Page Container */
+  .page-container {
+    @apply px-5 py-4;
+  }
+  
+  /* Card Base */
+  .card {
+    @apply bg-card rounded-card shadow-card;
+  }
+  
+  .card-interactive {
+    @apply card transition-shadow duration-200 active:shadow-none;
+  }
+  
+  /* Chip */
+  .chip {
+    @apply inline-flex items-center px-4 py-2 rounded-chip text-sm font-medium transition-colors;
+  }
+  
+  .chip-default {
+    @apply chip bg-card-soft text-text-secondary;
+  }
+  
+  .chip-active {
+    @apply chip bg-primary text-white;
+  }
+  
+  /* Button */
+  .btn {
+    @apply inline-flex items-center justify-center font-semibold transition-all duration-200 rounded-button;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary text-white px-5 py-3 active:bg-primary-dark;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-card-soft text-text-primary px-5 py-3 active:bg-border;
+  }
+  
+  .btn-ghost {
+    @apply btn text-text-secondary px-3 py-2 active:bg-card-soft;
+  }
+  
+  /* Input */
+  .input-field {
+    @apply w-full px-4 py-3 bg-card-soft rounded-button text-base placeholder:text-text-tertiary focus:ring-2 focus:ring-primary focus:ring-opacity-20;
+  }
+  
+  /* Divider */
+  .divider {
+    @apply h-px bg-border;
+  }
+  
+  .divider-thick {
+    @apply h-2 bg-border-light;
+  }
+  
+  /* Section Header */
+  .section-header {
+    @apply flex items-center justify-between mb-4;
+  }
+  
+  .section-title {
+    @apply text-lg font-bold text-text-primary;
+  }
+  
+  /* Empty State */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-center;
+  }
+  
+  .empty-state-icon {
+    @apply text-5xl mb-4;
+  }
+  
+  .empty-state-text {
+    @apply text-text-secondary text-base;
+  }
+  
+  /* Loading */
+  .loading-spinner {
+    @apply w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin;
+  }
+  
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full;
+  }
+  
+  .badge-primary {
+    @apply badge bg-primary text-white;
+  }
+  
+  .badge-error {
+    @apply badge bg-error text-white;
+  }
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* Staggered Animation */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
