@@ -10,7 +10,6 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 const categories = ['전체', '육아', '뷰티', '가전', '캠핑', '자취', '패션'];
 
-// 광고 슬롯 ID (AdSense에서 광고 단위 생성 후 교체 필요)
 const AD_SLOTS = {
   TOP_BANNER: '1234567890',
   IN_FEED: '2345678901',
@@ -37,7 +36,6 @@ export default function BlogPage() {
     <>
       <AppHeader />
       <div className="blog-page">
-        {/* 헤더 + 버튼들 */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -86,10 +84,8 @@ export default function BlogPage() {
           </div>
         </div>
 
-        {/* 상단 광고 배너 */}
         <BannerAd slot={AD_SLOTS.TOP_BANNER} position="top" />
 
-        {/* 카테고리 필터 */}
         <div className="category-chips">
           {categories.map((cat) => (
             <button
@@ -102,18 +98,15 @@ export default function BlogPage() {
           ))}
         </div>
 
-        {/* 에러 표시 */}
         {error && (
           <div className="error-message">
             {error}
           </div>
         )}
 
-        {/* 포스트 리스트 */}
         <div className="post-list">
           {(posts || []).map((post, index) => (
             <div key={post.slug}>
-              {/* slug 사용 */}
               <Link href={`/blog/${post.slug}`} className="post-card">
                 {post.previewImage && (
                   <img
@@ -139,22 +132,17 @@ export default function BlogPage() {
                 </div>
               </Link>
               
-              {/* 3번째 글 다음에 인피드 광고 */}
               {index === 2 && <InFeedAd slot={AD_SLOTS.IN_FEED} />}
-              
-              {/* 7번째 글 다음에 인피드 광고 */}
               {index === 6 && <InFeedAd slot={AD_SLOTS.IN_FEED} />}
             </div>
           ))}
 
-          {/* 로딩 표시 */}
           {isLoading && (
             <div className="loading">
               <div className="loading-spinner"></div>
             </div>
           )}
 
-          {/* 더 이상 없음 표시 */}
           {!hasMore && (posts || []).length > 0 && (
             <>
               <BannerAd slot={AD_SLOTS.BOTTOM_BANNER} position="bottom" />
@@ -164,7 +152,6 @@ export default function BlogPage() {
             </>
           )}
 
-          {/* 글 없음 표시 */}
           {!isLoading && (posts || []).length === 0 && (
             <div className="empty-state">
               <div className="empty-icon">📝</div>
@@ -175,7 +162,6 @@ export default function BlogPage() {
             </div>
           )}
 
-          {/* 무한스크롤 감지 영역 */}
           <div ref={targetRef} style={{ height: '20px' }} />
         </div>
       </div>
