@@ -1,6 +1,4 @@
 // src/dm/dm.service.ts
-// 기존 코드에 직거래 방지 기능만 추가한 버전
-
 import {
   Injectable,
   Logger,
@@ -12,19 +10,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DmBlockService } from './services/dm-block.service';
 import { SendMessageDto, MessageType } from './dto';
 import * as sanitizeHtml from 'sanitize-html';
-
-// 🆕 직거래 방지 패턴
-const BLOCKED_PATTERNS: { pattern: RegExp; type: string }[] = [
-  { pattern: /\d{3,4}[-\s]?\d{2,4}[-\s]?\d{4,7}/g, type: 'BANK_ACCOUNT' },
-  { pattern: /01[0-9][-.\s]?\d{3,4}[-.\s]?\d{4}/g, type: 'PHONE_NUMBER' },
-  { pattern: /카[카톡오]\s*[:=]?\s*[a-zA-Z0-9_]{2,20}/gi, type: 'KAKAO_ID' },
-  { pattern: /오픈\s*채팅/gi, type: 'KAKAO_OPENCHAT' },
-  { pattern: /텔레그램\s*[:=]?\s*@?[a-zA-Z0-9_]{2,30}/gi, type: 'TELEGRAM' },
-  { pattern: /t\.me\/[a-zA-Z0-9_]+/gi, type: 'TELEGRAM_LINK' },
-  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, type: 'EMAIL' },
-  { pattern: /계좌\s*(번호|입금|송금)/gi, type: 'BANK_KEYWORD' },
-  { pattern: /직거래/gi, type: 'DIRECT_TRADE' },
-];
 
 @Injectable()
 export class DmService {
@@ -114,7 +99,7 @@ export class DmService {
     });
 
     if (!thread) {
-      throw new NotFoundException('대화를 찾을 수 없습니다.');
+      throw new NotFoundException('스레드를 찾을 수 없습니다.');
     }
 
     if (thread.user1Id !== userId && thread.user2Id !== userId) {
@@ -138,7 +123,7 @@ export class DmService {
     });
 
     if (!thread) {
-      throw new NotFoundException('대화를 찾을 수 없습니다.');
+      throw new NotFoundException('스레드를 찾을 수 없습니다.');
     }
 
     if (thread.user1Id !== userId && thread.user2Id !== userId) {
@@ -154,12 +139,6 @@ export class DmService {
 
     // 메시지 정제 (XSS 방어)
     const sanitizedContent = this.sanitizeMessage(dto.content);
-
-    // 🆕 직거래 방지 검사
-    const tradeCheck = await this.checkDirectTrade(userId, threadId, sanitizedContent);
-    if (!tradeCheck.allowed) {
-      throw new ForbiddenException(tradeCheck.message);
-    }
 
     const [message] = await this.prisma.$transaction([
       this.prisma.dmMessage.create({
@@ -200,7 +179,7 @@ export class DmService {
     });
 
     if (!thread) {
-      throw new NotFoundException('대화를 찾을 수 없습니다.');
+      throw new NotFoundException('스레드를 찾을 수 없습니다.');
     }
 
     if (thread.user1Id !== userId && thread.user2Id !== userId) {
@@ -289,97 +268,6 @@ export class DmService {
   }
 
   // ========================================
-  // 🆕 직거래 방지
-  // ========================================
-
-  /**
-   * 직거래 시도 검사
-   */
- private async checkDirectTrade(
-  userId: string,
-  threadId: string,
-  content: string,
-): Promise<{ allowed: boolean; message?: string }> {
-  // S3 이미지 URL은 허용
-  const allowedDomains = [
-    'grooverapp-images.s3.ap-southeast-2.amazonaws.com',
-    's3.ap-southeast-2.amazonaws.com',
-  ];
-  
-  const isAllowedUrl = allowedDomains.some(domain => content.includes(domain));
-  if (isAllowedUrl) {
-    return { allowed: true };
-  }
-
-  const detectedTypes: string[] = [];
-
-  for (const { pattern, type } of BLOCKED_PATTERNS) {
-    const regex = new RegExp(pattern.source, pattern.flags);
-    if (regex.test(content)) {
-      detectedTypes.push(type);
-    }
-  }
-
-  if (detectedTypes.length === 0) {
-    return { allowed: true };
-  }
-
-  // 직거래 시도 로그 저장
-  try {
-    await this.prisma.directTradeAttempt.create({
-      data: {
-        userId,
-        threadId,
-        originalContent: content,
-        detectedPatterns: detectedTypes,
-        detectedTypes: detectedTypes,
-      },
-    });
-
-    // 경고 횟수 증가
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { warningCount: { increment: 1 } },
-    });
-
-    await this.prisma.userWarning.create({
-      data: {
-        userId,
-        type: 'DIRECT_TRADE_ATTEMPT',
-        reason: `직거래 시도: ${detectedTypes.join(', ')}`,
-      },
-    });
-
-    // 경고 3회 이상 → 광고 매칭 정지
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { warningCount: true },
-    });
-
-    if (user && user.warningCount >= 3) {
-      const suspendedUntil = new Date();
-      suspendedUntil.setDate(suspendedUntil.getDate() + 1);
-
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          adMatchingSuspended: true,
-          suspendedUntil,
-        },
-      });
-    }
-  } catch (error) {
-    this.logger.error('직거래 로그 저장 실패:', error);
-  }
-
-  return {
-    allowed: false,
-    message: '안전결제 보호를 위해 외부 연락처 공유가 제한됩니다. 모든 광고비 결제는 Groover를 통해 진행해주세요.',
-  };
-}
-
-    
-  // ========================================
   // 헬퍼 메서드
   // ========================================
 
@@ -405,7 +293,7 @@ export class DmService {
   private formatThreadWithUser(thread: any, userId: string) {
     const isUser1 = thread.user1Id === userId;
     const partner = isUser1 ? thread.user2 : thread.user1;
-    
+
     return {
       id: thread.id,
       partner: {

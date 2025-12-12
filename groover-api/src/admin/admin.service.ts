@@ -1,8 +1,7 @@
 // src/admin/admin.service.ts
-
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SuspendUserDto, WarnUserDto, ProcessReportDto } from './dto/admin.dto';
+import { WarnUserDto, ProcessReportDto } from './dto/admin.dto';
 
 @Injectable()
 export class AdminService {
@@ -21,128 +20,25 @@ export class AdminService {
     const [
       totalUsers,
       newUsersThisMonth,
-      totalDeals,
-      completedDeals,
-      activeDeals,
-      totalVolumeResult,
-      monthlyVolumeResult,
+      totalPosts,
+      publishedPosts,
       pendingReports,
-      directTradeAttempts,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({
         where: { createdAt: { gte: startOfMonth } },
       }),
-      this.prisma.adDeal.count(),
-      this.prisma.adDeal.count({ where: { status: 'SETTLED' } }),
-      this.prisma.adDeal.count({
-        where: { status: { in: ['PAID', 'SUBMITTED'] } },
-      }),
-      this.prisma.adDeal.aggregate({
-        where: { status: 'SETTLED' },
-        _sum: { totalAmount: true, platformFee: true },
-      }),
-      this.prisma.adDeal.aggregate({
-        where: { status: 'SETTLED', settledAt: { gte: startOfMonth } },
-        _sum: { totalAmount: true, platformFee: true },
-      }),
+      this.prisma.post.count(),
+      this.prisma.post.count({ where: { status: 'PUBLISHED' } }),
       this.prisma.dmReport.count({ where: { status: 'PENDING' } }),
-      this.prisma.directTradeAttempt.count({
-        where: { createdAt: { gte: startOfMonth } },
-      }),
     ]);
-
-    const avgDealAmount = completedDeals > 0
-      ? Math.round((totalVolumeResult._sum.totalAmount || 0) / completedDeals)
-      : 0;
 
     return {
       totalUsers,
       newUsersThisMonth,
-      totalDeals,
-      completedDeals,
-      activeDeals,
-      totalTransactionVolume: totalVolumeResult._sum.totalAmount || 0,
-      totalPlatformFees: totalVolumeResult._sum.platformFee || 0,
-      monthlyTransactionVolume: monthlyVolumeResult._sum.totalAmount || 0,
-      monthlyPlatformFees: monthlyVolumeResult._sum.platformFee || 0,
-      avgDealAmount,
+      totalPosts,
+      publishedPosts,
       pendingReports,
-      directTradeAttempts,
-    };
-  }
-
-  // ========================================
-  // 수익 분석
-  // ========================================
-
-  async getRevenueAnalytics(days: number = 30) {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // 이전 기간 (비교용)
-    const prevEndDate = new Date(startDate);
-    const prevStartDate = new Date();
-    prevStartDate.setDate(prevStartDate.getDate() - days * 2);
-
-    // 현재 기간 거래
-    const currentDeals = await this.prisma.adDeal.findMany({
-      where: {
-        status: 'SETTLED',
-        settledAt: { gte: startDate, lte: endDate },
-      },
-      select: { totalAmount: true, platformFee: true, settledAt: true },
-    });
-
-    // 이전 기간 거래
-    const prevDeals = await this.prisma.adDeal.aggregate({
-      where: {
-        status: 'SETTLED',
-        settledAt: { gte: prevStartDate, lte: prevEndDate },
-      },
-      _sum: { platformFee: true },
-    });
-
-    // 일별 그룹핑
-    const dailyMap = new Map<string, { deals: number; volume: number; fees: number }>();
-    
-    for (const deal of currentDeals) {
-      const date = deal.settledAt!.toISOString().split('T')[0];
-      const existing = dailyMap.get(date) || { deals: 0, volume: 0, fees: 0 };
-      existing.deals += 1;
-      existing.volume += deal.totalAmount;
-      existing.fees += deal.platformFee;
-      dailyMap.set(date, existing);
-    }
-
-    // 유저 증가 (일별)
-    const newUsers = await this.prisma.user.groupBy({
-      by: ['createdAt'],
-      where: { createdAt: { gte: startDate, lte: endDate } },
-      _count: true,
-    });
-
-    const daily = Array.from(dailyMap.entries()).map(([date, data]) => ({
-      date,
-      newUsers: 0, // 나중에 매핑
-      deals: data.deals,
-      volume: data.volume,
-      fees: data.fees,
-    })).sort((a, b) => a.date.localeCompare(b.date));
-
-    const totalRevenue = currentDeals.reduce((sum, d) => sum + d.platformFee, 0);
-    const prevRevenue = prevDeals._sum.platformFee || 0;
-    const growthRate = prevRevenue > 0
-      ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100 * 100) / 100
-      : 0;
-    const avgDailyRevenue = days > 0 ? Math.round(totalRevenue / days) : 0;
-
-    return {
-      daily,
-      totalRevenue,
-      growthRate,
-      avgDailyRevenue,
     };
   }
 
@@ -159,7 +55,7 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    
+
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
@@ -168,7 +64,7 @@ export class AdminService {
     }
 
     if (filter === 'suspended') {
-      where.adMatchingSuspended = true;
+      where.suspendedUntil = { not: null };
     } else if (filter === 'warned') {
       where.warningCount = { gt: 0 };
     }
@@ -185,10 +81,9 @@ export class AdminService {
           name: true,
           profileImageUrl: true,
           warningCount: true,
-          adMatchingSuspended: true,
+          suspendedUntil: true,
           createdAt: true,
-          wallet: { select: { totalEarned: true } },
-          _count: { select: { creatorDeals: { where: { status: 'SETTLED' } } } },
+          _count: { select: { posts: true } },
         },
       }),
       this.prisma.user.count({ where }),
@@ -201,10 +96,9 @@ export class AdminService {
         name: u.name,
         profileImageUrl: u.profileImageUrl,
         warningCount: u.warningCount,
-        adMatchingSuspended: u.adMatchingSuspended,
+        suspendedUntil: u.suspendedUntil,
         createdAt: u.createdAt,
-        totalEarnings: u.wallet?.totalEarned || 0,
-        completedDeals: u._count.creatorDeals,
+        postCount: u._count.posts,
       })),
       total,
       page,
@@ -216,23 +110,8 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        wallet: true,
         warnings: { orderBy: { createdAt: 'desc' }, take: 10 },
-        directTradeAttempts: { orderBy: { createdAt: 'desc' }, take: 10 },
-        creatorDeals: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-          include: {
-            advertiser: { select: { id: true, name: true } },
-          },
-        },
-        advertiserDeals: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-          include: {
-            creator: { select: { id: true, name: true } },
-          },
-        },
+        posts: { orderBy: { createdAt: 'desc' }, take: 10 },
       },
     });
 
@@ -246,52 +125,44 @@ export class AdminService {
       name: user.name,
       profileImageUrl: user.profileImageUrl,
       warningCount: user.warningCount,
-      adMatchingSuspended: user.adMatchingSuspended,
       suspendedUntil: user.suspendedUntil,
       createdAt: user.createdAt,
-      walletBalance: user.wallet?.balance || 0,
-      pendingBalance: user.wallet?.pendingBalance || 0,
-      totalEarnings: user.wallet?.totalEarned || 0,
       warnings: user.warnings,
-      directTradeAttempts: user.directTradeAttempts,
-      recentDeals: [
-        ...user.creatorDeals.map(d => ({ ...d, role: 'creator' })),
-        ...user.advertiserDeals.map(d => ({ ...d, role: 'advertiser' })),
-      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 10),
+      recentPosts: user.posts,
     };
   }
 
-  async suspendUser(userId: string, dto: SuspendUserDto) {
+  async suspendUser(userId: string, days: number, reason: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('유저를 찾을 수 없습니다.');
     }
 
     const suspendedUntil = new Date();
-    suspendedUntil.setDate(suspendedUntil.getDate() + dto.days);
+    suspendedUntil.setDate(suspendedUntil.getDate() + days);
 
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { adMatchingSuspended: true, suspendedUntil },
+        data: { suspendedUntil },
       }),
       this.prisma.userWarning.create({
         data: {
           userId,
           type: 'OTHER',
-          reason: `관리자 제재: ${dto.reason} (${dto.days}일 정지)`,
+          reason: `관리자 정지: ${reason} (${days}일 정지)`,
         },
       }),
     ]);
 
-    this.logger.warn(`유저 정지: userId=${userId}, days=${dto.days}`);
+    this.logger.warn(`유저 정지: userId=${userId}, days=${days}`);
     return { success: true, suspendedUntil };
   }
 
   async unsuspendUser(userId: string) {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { adMatchingSuspended: false, suspendedUntil: null },
+      data: { suspendedUntil: null },
     });
 
     this.logger.log(`유저 정지 해제: userId=${userId}`);
@@ -333,7 +204,7 @@ export class AdminService {
   ) {
     const skip = (page - 1) * limit;
     const where: any = {};
-    
+
     if (status) {
       where.status = status;
     }
@@ -390,13 +261,10 @@ export class AdminService {
       },
     });
 
-    // 피신고자 제재
+    // 신고당한 유저 제재
     if (dto.punishUser && dto.status === 'RESOLVED') {
       if (dto.suspendDays) {
-        await this.suspendUser(report.reportedId, {
-          days: dto.suspendDays,
-          reason: `신고 처리: ${report.reason}`,
-        });
+        await this.suspendUser(report.reportedId, dto.suspendDays, `신고 처리: ${report.reason}`);
       } else {
         await this.warnUser(report.reportedId, {
           type: 'ABUSE',
@@ -410,72 +278,24 @@ export class AdminService {
   }
 
   // ========================================
-  // 거래 모니터링
+  // 게시글 관리
   // ========================================
 
-  async getDeals(
+  async getPosts(
     page: number = 1,
     limit: number = 20,
     status?: string,
-    overdue?: boolean,
   ) {
     const skip = (page - 1) * limit;
     const where: any = {};
-    const now = new Date();
 
     if (status) {
       where.status = status;
     }
 
-    if (overdue) {
-      where.OR = [
-        { status: 'PAID', submitDeadline: { lt: now } },
-        { status: 'SUBMITTED', confirmDeadline: { lt: now } },
-      ];
-    }
-
-    const [deals, total] = await Promise.all([
-      this.prisma.adDeal.findMany({
+    const [posts, total] = await Promise.all([
+      this.prisma.post.findMany({
         where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          advertiser: { select: { id: true, name: true, email: true } },
-          creator: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      this.prisma.adDeal.count({ where }),
-    ]);
-
-    return {
-      items: deals.map(d => ({
-        id: d.id,
-        advertiser: d.advertiser,
-        creator: d.creator,
-        title: d.title,
-        totalAmount: d.totalAmount,
-        platformFee: d.platformFee,
-        status: d.status,
-        createdAt: d.createdAt,
-        submitDeadline: d.submitDeadline,
-        confirmDeadline: d.confirmDeadline,
-      })),
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  // ========================================
-  // 직거래 시도 로그
-  // ========================================
-
-  async getDirectTradeLogs(page: number = 1, limit: number = 20) {
-    const skip = (page - 1) * limit;
-
-    const [logs, total] = await Promise.all([
-      this.prisma.directTradeAttempt.findMany({
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -483,17 +303,19 @@ export class AdminService {
           user: { select: { id: true, name: true, email: true } },
         },
       }),
-      this.prisma.directTradeAttempt.count(),
+      this.prisma.post.count({ where }),
     ]);
 
     return {
-      items: logs.map(log => ({
-        id: log.id,
-        user: log.user,
-        originalContent: log.originalContent,
-        detectedPatterns: log.detectedPatterns,
-        detectedTypes: log.detectedTypes,
-        createdAt: log.createdAt,
+      items: posts.map(p => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        viewCount: p.viewCount,
+        likeCount: p.likeCount,
+        author: p.user,
+        createdAt: p.createdAt,
+        publishedAt: p.publishedAt,
       })),
       total,
       page,
@@ -501,69 +323,30 @@ export class AdminService {
     };
   }
 
-  // ========================================
-  // 분석 차트 데이터
-  // ========================================
+  async hidePost(postId: string, reason: string) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
 
-  async getDealStatusDistribution() {
-    const statuses = await this.prisma.adDeal.groupBy({
-      by: ['status'],
-      _count: true,
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { status: 'HIDDEN' },
     });
 
-    return statuses.map(s => ({
-      status: s.status,
-      count: s._count,
-    }));
+    this.logger.warn(`게시글 숨김: postId=${postId}, reason=${reason}`);
+    return { success: true };
   }
 
-  async getTopCreators(limit: number = 10) {
-    const creators = await this.prisma.adDeal.groupBy({
-      by: ['creatorId'],
-      where: { status: 'SETTLED' },
-      _sum: { creatorAmount: true },
-      _count: true,
-      orderBy: { _sum: { creatorAmount: 'desc' } },
-      take: limit,
-    });
+  async deletePost(postId: string, reason: string) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
 
-    const userIds = creators.map(c => c.creatorId);
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
+    await this.prisma.post.delete({ where: { id: postId } });
 
-    const userMap = new Map(users.map(u => [u.id, u]));
-
-    return creators.map(c => ({
-      user: userMap.get(c.creatorId),
-      totalEarnings: c._sum.creatorAmount || 0,
-      dealCount: c._count,
-    }));
-  }
-
-  async getTopAdvertisers(limit: number = 10) {
-    const advertisers = await this.prisma.adDeal.groupBy({
-      by: ['advertiserId'],
-      where: { status: 'SETTLED' },
-      _sum: { totalAmount: true },
-      _count: true,
-      orderBy: { _sum: { totalAmount: 'desc' } },
-      take: limit,
-    });
-
-    const userIds = advertisers.map(a => a.advertiserId);
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
-
-    const userMap = new Map(users.map(u => [u.id, u]));
-
-    return advertisers.map(a => ({
-      user: userMap.get(a.advertiserId),
-      totalSpent: a._sum.totalAmount || 0,
-      dealCount: a._count,
-    }));
+    this.logger.warn(`게시글 삭제: postId=${postId}, reason=${reason}`);
+    return { success: true };
   }
 }

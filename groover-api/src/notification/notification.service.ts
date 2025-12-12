@@ -21,14 +21,13 @@ export class NotificationService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ========================================
-  // 알림 생성 (내부 호출용)
+  // 알림 생성
   // ========================================
 
   async create(params: CreateNotificationParams) {
     const { userId, type, title, message, targetType, targetId, metadata } = params;
 
     try {
-      // 1. DB에 알림 저장
       const notification = await this.prisma.notification.create({
         data: {
           userId,
@@ -41,7 +40,6 @@ export class NotificationService {
         },
       });
 
-      // 2. 중요한 알림만 푸시 발송
       if (PUSH_PRIORITY[type]) {
         await this.sendPush(userId, notification.id, title, message);
       }
@@ -72,7 +70,6 @@ export class NotificationService {
     const hasMore = notifications.length > limit;
     const items = hasMore ? notifications.slice(0, -1) : notifications;
 
-    // 안읽은 개수
     const unreadCount = await this.prisma.notification.count({
       where: { userId, isRead: false },
     });
@@ -101,13 +98,11 @@ export class NotificationService {
 
   async markAsRead(userId: string, notificationId?: string) {
     if (notificationId) {
-      // 단일 읽음
       await this.prisma.notification.updateMany({
         where: { id: notificationId, userId },
         data: { isRead: true, readAt: new Date() },
       });
     } else {
-      // 전체 읽음
       await this.prisma.notification.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true, readAt: new Date() },
@@ -118,7 +113,7 @@ export class NotificationService {
   }
 
   // ========================================
-  // 안읽은 개수
+  // 읽지않은 개수
   // ========================================
 
   async getUnreadCount(userId: string): Promise<number> {
@@ -132,7 +127,6 @@ export class NotificationService {
   // ========================================
 
   async registerPushToken(userId: string, token: string, platform: string, deviceId?: string) {
-    // 기존 토큰 비활성화 (같은 디바이스)
     if (deviceId) {
       await this.prisma.pushToken.updateMany({
         where: { userId, deviceId },
@@ -140,7 +134,6 @@ export class NotificationService {
       });
     }
 
-    // 토큰 등록 (upsert)
     return this.prisma.pushToken.upsert({
       where: { token },
       create: { userId, token, platform, deviceId, isActive: true },
@@ -162,7 +155,6 @@ export class NotificationService {
 
   private async sendPush(userId: string, notificationId: string, title: string, message: string) {
     try {
-      // 유저의 활성 토큰 조회
       const tokens = await this.prisma.pushToken.findMany({
         where: { userId, isActive: true },
         select: { token: true, platform: true },
@@ -175,12 +167,6 @@ export class NotificationService {
       // FCM 발송 (실제 구현 필요)
       // await this.fcmService.sendMulticast(tokens, title, message);
 
-      // 발송 완료 표시
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: { isPushed: true, pushedAt: new Date() },
-      });
-
       this.logger.log(`푸시 발송: userId=${userId}, tokens=${tokens.length}`);
     } catch (error) {
       this.logger.error('푸시 발송 실패:', error);
@@ -188,75 +174,61 @@ export class NotificationService {
   }
 
   // ========================================
-  // 편의 메서드 - 거래 알림
+  // 커뮤니티 알림 메서드
   // ========================================
 
-  async notifyDealProposed(creatorId: string, dealId: string, advertiserName: string, title: string) {
-    return this.create({
-      userId: creatorId,
-      type: NotificationType.DEAL_PROPOSED,
-      title: '새로운 광고 제안',
-      message: `${advertiserName}님이 "${title}" 광고를 제안했습니다.`,
-      targetType: 'deal',
-      targetId: dealId,
-    });
-  }
-
-  async notifyDealAccepted(advertiserId: string, dealId: string, creatorName: string, title: string) {
-    return this.create({
-      userId: advertiserId,
-      type: NotificationType.DEAL_ACCEPTED,
-      title: '제안 수락됨',
-      message: `${creatorName}님이 "${title}" 제안을 수락했습니다.`,
-      targetType: 'deal',
-      targetId: dealId,
-    });
-  }
-
-  async notifyDealPaid(creatorId: string, dealId: string, amount: number, title: string) {
-    return this.create({
-      userId: creatorId,
-      type: NotificationType.DEAL_PAID,
-      title: '결제 완료',
-      message: `"${title}" 광고비 ${amount.toLocaleString()}원이 에스크로에 입금되었습니다.`,
-      targetType: 'deal',
-      targetId: dealId,
-      metadata: { amount },
-    });
-  }
-
-  async notifyDealSubmitted(advertiserId: string, dealId: string, creatorName: string, title: string) {
-    return this.create({
-      userId: advertiserId,
-      type: NotificationType.DEAL_SUBMITTED,
-      title: '콘텐츠 제출됨',
-      message: `${creatorName}님이 "${title}" 콘텐츠를 제출했습니다. 72시간 내 확인해주세요.`,
-      targetType: 'deal',
-      targetId: dealId,
-    });
-  }
-
-  async notifyDealSettled(creatorId: string, dealId: string, amount: number, title: string) {
-    return this.create({
-      userId: creatorId,
-      type: NotificationType.DEAL_SETTLED,
-      title: '정산 완료',
-      message: `"${title}" 광고비 ${amount.toLocaleString()}원이 정산되었습니다.`,
-      targetType: 'deal',
-      targetId: dealId,
-      metadata: { amount },
-    });
-  }
-
-  async notifyDealDeadline(userId: string, dealId: string, title: string, hoursLeft: number) {
+  async notifyNewFollower(userId: string, followerName: string, followerId: string) {
     return this.create({
       userId,
-      type: NotificationType.DEAL_DEADLINE,
-      title: '기한 임박',
-      message: `"${title}" 기한이 ${hoursLeft}시간 남았습니다.`,
-      targetType: 'deal',
-      targetId: dealId,
-      metadata: { hoursLeft },
+      type: NotificationType.NEW_FOLLOWER,
+      title: '새로운 팔로워',
+      message: `${followerName}님이 회원님을 팔로우합니다.`,
+      targetType: 'user',
+      targetId: followerId,
+    });
+  }
+
+  async notifyPostLike(userId: string, likerName: string, postId: string, postTitle: string) {
+    return this.create({
+      userId,
+      type: NotificationType.POST_LIKE,
+      title: '게시글 좋아요',
+      message: `${likerName}님이 "${postTitle}" 게시글을 좋아합니다.`,
+      targetType: 'post',
+      targetId: postId,
+    });
+  }
+
+  async notifyNewComment(userId: string, commenterName: string, postId: string, postTitle: string) {
+    return this.create({
+      userId,
+      type: NotificationType.NEW_COMMENT,
+      title: '새 댓글',
+      message: `${commenterName}님이 "${postTitle}"에 댓글을 남겼습니다.`,
+      targetType: 'post',
+      targetId: postId,
+    });
+  }
+
+  async notifyCommentReply(userId: string, replierName: string, postId: string) {
+    return this.create({
+      userId,
+      type: NotificationType.COMMENT_REPLY,
+      title: '답글 알림',
+      message: `${replierName}님이 회원님의 댓글에 답글을 남겼습니다.`,
+      targetType: 'post',
+      targetId: postId,
+    });
+  }
+
+  async notifyNewMessage(userId: string, senderName: string, roomId: string) {
+    return this.create({
+      userId,
+      type: NotificationType.NEW_MESSAGE,
+      title: '새 메시지',
+      message: `${senderName}님이 메시지를 보냈습니다.`,
+      targetType: 'dm',
+      targetId: roomId,
     });
   }
 
@@ -266,16 +238,6 @@ export class NotificationService {
       type: NotificationType.WARNING_RECEIVED,
       title: '경고 알림',
       message: `경고를 받았습니다: ${reason}`,
-    });
-  }
-
-  async notifyWithdrawalComplete(userId: string, amount: number) {
-    return this.create({
-      userId,
-      type: NotificationType.WITHDRAWAL_COMPLETE,
-      title: '출금 완료',
-      message: `${amount.toLocaleString()}원 출금이 완료되었습니다.`,
-      metadata: { amount },
     });
   }
 }
