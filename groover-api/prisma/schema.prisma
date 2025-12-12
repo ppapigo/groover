@@ -1,5 +1,5 @@
 // prisma/schema.prisma
-// Groover - AI 기반 스마트 장바구니 추천 서비스
+// Groover - 쇼핑 커뮤니티 플랫폼
 
 generator client {
   provider = "prisma-client-js"
@@ -21,30 +21,40 @@ enum Role {
 // ==================== USER ====================
 model User {
   id              String    @id @default(uuid())
-  userId          String?   @unique @map("user_id") 
+  userId          String?   @unique @map("user_id")
   email           String    @unique
   passwordHash    String    @map("password_hash")
   name            String?
   profileImageUrl String?   @map("profile_image_url")
-  preferences     Json?     // 사용자 선호도 (브랜드, 카테고리 등)
+  bio             String?   // 자기소개
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-  warningCount        Int       @default(0)
-  adMatchingSuspended Boolean   @default(false)
-  suspendedUntil      DateTime?
-  role Role @default(USER)
-  statsCache      UserStatsCache?
-  adminActions    AdminActionLog[] @relation("AdminActions")
-  googleId String? @unique
-  isProfilePublic  Boolean  @default(true)  // 프로필 공개 여부
+  warningCount    Int       @default(0)
+  suspendedUntil  DateTime?
+  role            Role      @default(USER)
+  googleId        String?   @unique
+  isProfilePublic Boolean   @default(true)
+  isVerified      Boolean   @default(false)
+
+  // 관계
+  posts             Post[]
+  postLikes         PostLike[]
+  postShares        PostShare[]
+  comments          Comment[]
   
-  carts           Cart[]
-  recommendations Recommendation[]
-  budgetProfiles  BudgetProfile[]
-  conversations   Conversation[]
-  posts     Post[]
-  postLikes PostLike[]
-   // DM 관계
+  // 태그 시스템
+  pinnedTags        UserPinnedTag[]
+  
+  // 토론
+  discussions       Discussion[]
+  discussionComments DiscussionComment[]
+  discussionVotes   DiscussionVote[]
+
+  // 팔로우
+  followers         Follow[] @relation("Following")
+  following         Follow[] @relation("Followers")
+
+  // DM
   dmThreadsAsUser1  DmThread[]  @relation("DmThreadUser1")
   dmThreadsAsUser2  DmThread[]  @relation("DmThreadUser2")
   dmMessages        DmMessage[]
@@ -52,360 +62,174 @@ model User {
   dmBlocksReceived  DmBlock[]   @relation("DmBlocked")
   dmReportsMade     DmReport[]  @relation("DmReporter")
   dmReportsReceived DmReport[]  @relation("DmReported")
-  adProposalsSent      AdProposal[]  @relation("AdProposalAdvertiser")
-  adProposalsReceived  AdProposal[]  @relation("AdProposalCreator")
-  adPayments           AdPayment[]
-  wallet               Wallet?
-  settlements          Settlement[]
-  withdrawals          Withdrawal[]
 
-  eventLogs           EventLog[]
-  dailyStats          DailyStat[]
-  directTradeAttempts DirectTradeAttempt[]
-  warnings            UserWarning[]
-  advertiserDeals     AdDeal[] @relation("AdvertiserDeals")
-  creatorDeals        AdDeal[] @relation("CreatorDeals")
- 
-  notifications  Notification[]
-  pushTokens     PushToken[]
+  // 알림
+  notifications     Notification[]
+  pushTokens        PushToken[]
+  fcmTokens         FcmToken[]
 
-  searchHistories SearchHistory[]
-
-  postShares PostShare[]
-  refreshTokens RefreshToken[]
-    
-  fcmTokens FcmToken[]
-
-  isVerified      Boolean   @default(false)
+  // 기타
+  searchHistories   SearchHistory[]
+  refreshTokens     RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
+  warnings          UserWarning[]
+  eventLogs         EventLog[]
+  adminActions      AdminActionLog[] @relation("AdminActions")
 
-  postHistories UserPostHistory[]
   @@map("users")
 }
-model Conversation {
-  id                      String    @id @default(uuid())
-  userId                  String
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  status                  String    @default("ACTIVE")  // ACTIVE, COMPLETED, ABANDONED
-  
-  // 현재 대화 상태
-  currentRecommendationId String?
-  currentContext          Json?     // 파싱된 컨텍스트 (예산, 선호도 등)
-  
-  messages                ConversationMessage[]
-  
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-  
-  @@index([userId])
-  @@index([status])
-  @@index([updatedAt])
-}
 
-model ConversationMessage {
-  id              String       @id @default(uuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  role            String       // USER, ASSISTANT
-  content         String       // 원본 메시지
-  
-  // 파싱 결과 (USER 메시지인 경우)
-  parsedIntent    String?      // CREATE_CART, REFINE_CART, QUESTION, etc.
-  parsedParams    Json?        // 추출된 파라미터
-  usedLlm         Boolean      @default(false)  // LLM 사용 여부
-  
-  // 응답 메타데이터 (ASSISTANT 메시지인 경우)
-  recommendationId  String?
-  processingTimeMs  Int?
-  
-  createdAt       DateTime     @default(now())
-  
-  @@index([conversationId])
-  @@index([createdAt])
-}
-
-
-
-
-// ==================== BUDGET ====================
-model BudgetProfile {
+// ==================== FOLLOW ====================
+model Follow {
   id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  name        String   // "이번 달 장보기", "주간 식료품" 등
-  totalBudget Int      @map("total_budget")
-  currency    String   @default("KRW")
-  isDefault   Boolean  @default(false) @map("is_default")
-  categories  Json?    // 카테고리별 비율 및 우선순위
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recommendations Recommendation[]
-  
-  @@index([userId])
-  @@map("budget_profiles")
+  followerId  String
+  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
-// ==================== PRODUCT ====================
-model Product {
-  id            String   @id @default(uuid())
-  externalId    String?  @unique @map("external_id")
-  name          String
-  normalizedName String? @map("normalized_name") // 검색용 정규화 이름
-  description   String?
-  price         Int
-  originalPrice Int?     @map("original_price") // 정가 (할인 전)
-  category      String
-  subcategory   String?
-  brand         String?
-  imageUrl      String?  @map("image_url")
-  tags          String[] @default([])
-  
-  // 스코어링용
-  rating        Decimal? @db.Decimal(2, 1)
-  reviewCount   Int      @default(0) @map("review_count")
-  popularityScore Float? @default(0) @map("popularity_score")
-  
-  // 출처 정보
-  source        String   @default("manual") // "coupang", "naver", "manual"
-  sourceUrl     String?  @map("source_url")
-  metadata      Json?
-  
-  // 상태
-  isActive      Boolean  @default(true) @map("is_active")
-  lastSynced    DateTime @default(now()) @map("last_synced")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  
-  cartItems     CartItem[]
-  productSources ProductSource[]
-  
-  @@index([category, price])
-  @@index([source])
-  @@index([rating, reviewCount])
-  @@index([isActive])
-  @@index([normalizedName])
-  @@map("products")
+// ==================== TAG SYSTEM ====================
+
+// 피드용 태그 (Controlled) - 관리자/시스템이 생성
+model FeedTag {
+  id          String   @id @default(uuid())
+  name        String   @unique  // 정규화된 이름 (노트북, 러닝화 등)
+  slug        String   @unique  // URL용 (notebook, running-shoes)
+  category    String?  // 상위 카테고리 (전자기기, 패션 등)
+  description String?
+  iconEmoji   String?  // 아이콘 이모지
+  postCount   Int      @default(0)  // 이 태그 사용한 글 수
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 관계
+  posts       PostFeedTag[]
+  pinnedBy    UserPinnedTag[]
+  mappings    TagMapping[]
+  discussions Discussion[]
+
+  @@index([category])
+  @@index([postCount])
 }
 
-// ==================== PRODUCT SOURCE ====================
-// 각 쇼핑몰별 상품 정보
-model ProductSource {
-  id            String   @id @default(uuid())
-  productId     String   @map("product_id")
-  platform      String   // "COUPANG", "NAVER", "ELEVENST" 등
-  externalId    String?  @map("external_id") // 외부 플랫폼 상품 ID
-  price         Int
-  url           String?
-  searchQuery   String?  @map("search_query") // URL 생성용 검색 쿼리
-  availability  String   @default("UNKNOWN") // "AVAILABLE", "OUT_OF_STOCK", "DISCONTINUED"
-  lastCheckedAt DateTime? @map("last_checked_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  @@unique([productId, platform])
-  @@index([platform])
-  @@map("product_sources")
-}
-
-// ==================== CART ====================
-model Cart {
-  id               String   @id @default(uuid())
-  userId           String   @map("user_id")
-  recommendationId String?  @unique @map("recommendation_id")
-  name             String?
-  budget           Int?
-  totalPrice       Int      @default(0) @map("total_price")
-  itemCount        Int      @default(0) @map("item_count")
-  grooverCode      String?  @unique @map("groover_code") // Groover Code
-  isPublic         Boolean  @default(false) @map("is_public")
-  viewCount        Int      @default(0) @map("view_count")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-  
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cartItems        CartItem[]
-  
-  @@index([userId])
-  @@index([grooverCode])
-  @@map("carts")
-}
-
-// ==================== CART ITEM ====================
-model CartItem {
-  id              String   @id @default(uuid())
-  cartId          String   @map("cart_id")
-  productId       String   @map("product_id")
-  quantity        Int      @default(1)
-  priceAtAddition Int      @map("price_at_addition")
-  scoreAtAdd      Float?   @map("score_at_add")
-  createdAt       DateTime @default(now()) @map("created_at")
-  
-  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product         Product  @relation(fields: [productId], references: [id])
-  
-  @@unique([cartId, productId])
-  @@map("cart_items")
-}
-model EmailVerificationToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  email     String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  usedAt    DateTime?
+// 검색용 태그 (Freeform) - 누구나 생성 가능
+model FreeTag {
+  id        String   @id @default(uuid())
+  name      String   @unique  // 원본 그대로 (갤탭s9울트라, 내돈내산 등)
+  useCount  Int      @default(0)  // 사용 횟수
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 관계
+  posts     PostFreeTag[]
+  mappings  TagMapping[]
 
-  @@index([token])
+  @@index([useCount])
+}
+
+// 검색태그 → 피드태그 매핑
+model TagMapping {
+  id         String   @id @default(uuid())
+  freeTagId  String
+  freeTag    FreeTag  @relation(fields: [freeTagId], references: [id], onDelete: Cascade)
+  feedTagId  String
+  feedTag    FeedTag  @relation(fields: [feedTagId], references: [id], onDelete: Cascade)
+  confidence Float    @default(1.0)  // 매핑 신뢰도 (0~1)
+  createdAt  DateTime @default(now())
+
+  @@unique([freeTagId, feedTagId])
+  @@index([freeTagId])
+  @@index([feedTagId])
+}
+
+// 유저가 핀한 피드태그
+model UserPinnedTag {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedTagId String
+  feedTag   FeedTag  @relation(fields: [feedTagId], references: [id], onDelete: Cascade)
+  order     Int      @default(0)  // 정렬 순서
+  createdAt DateTime @default(now())
+
+  @@unique([userId, feedTagId])
   @@index([userId])
 }
 
-// ==================== RECOMMENDATION ====================
-model Recommendation {
-  id               String   @id @default(uuid())
-  userId           String   @map("user_id")
-  budgetProfileId  String?  @map("budget_profile_id")
-  
-  // 요청 정보
-  requestPayload   Json?    @map("request_payload")
-  totalBudget      Int      @map("total_budget")
-  
-  // 결과
-  status           String   @default("PENDING") // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
-  resultPayload    Json?    @map("result_payload")
-  grooverCode      String?  @unique @map("groover_code")
-  
-  // 요약
-  totalPrice       Int?     @map("total_price")
-  totalItems       Int?     @map("total_items")
-  savedAmount      Int?     @map("saved_amount")
-  
-  // AI 관련
-  usedAi           Boolean  @default(false) @map("used_ai")
-  aiExplanation    String?  @map("ai_explanation")
-  aiTokensUsed     Int?     @map("ai_tokens_used")
-  
-  // 알고리즘 정보
-  algorithmVersion String   @default("v1") @map("algorithm_version")
-  processingTimeMs Int?     @map("processing_time_ms")
-  
-  createdAt        DateTime @default(now()) @map("created_at")
-  expiresAt        DateTime? @map("expires_at")
-  
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-   history         RecommendationHistory[]  
-  budgetProfile    BudgetProfile? @relation(fields: [budgetProfileId], references: [id])
-  
-  @@index([userId])
-  @@index([grooverCode])
-  @@index([status])
-  @@map("recommendations")
-}
-// ============================================
-// Recommendation History (추천 수정 이력)
-// ============================================
-
-model RecommendationHistory {
-  id                String         @id @default(uuid())
-  recommendationId  String
-  recommendation    Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
-  
-  version           Int
-  action            String         // CREATED, REFINED, RESTORED
-  changes           Json           // 변경 내용
-  previousState     Json?          // 이전 상태
-  
-  createdAt         DateTime       @default(now())
-  
-  @@index([recommendationId])
-  @@index([createdAt])
-}
-// prisma/schema.prisma 에 추가할 내용
-// ============================================
-// Blog Models (쇼핑 기반 블로그)
-// ============================================
-
+// ==================== POST ====================
 model Post {
   id            String    @id @default(uuid())
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   title         String
-  content       String    // HTML/Markdown
-  previewImage  String?   // 대표 이미지 URL
-  tags          String[]  // 태그 배열
+  content       String
+  previewImage  String?
   
+  // 기존 태그 (하위호환)
+  tags          String[]
+
   // SEO
-  slug          String    @unique  // URL-friendly slug
-  excerpt       String?   // 요약 (미리보기용)
-  
+  slug          String    @unique
+  excerpt       String?
+
   // 통계
   viewCount     Int       @default(0)
   likeCount     Int       @default(0)
-  
+  shareCount    Int       @default(0)
+  commentCount  Int       @default(0)
+
   // 상태
   status        String    @default("DRAFT")  // DRAFT, PUBLISHED, HIDDEN
   publishedAt   DateTime?
-  
-  // 파트너스 관련
-  hasAffiliateLinks  Boolean  @default(false)  // 파트너스 링크 포함 여부
-  
-  // 관계
-  products      PostProduct[]
-  likes         PostLike[]
 
-  shareCount Int @default(0)
-  shares     PostShare[]
-  viewHistories UserPostHistory[]
-  
+  // 관계
+  feedTags      PostFeedTag[]
+  freeTags      PostFreeTag[]
+  likes         PostLike[]
+  shares        PostShare[]
+  comments      Comment[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
   @@index([userId])
   @@index([status])
   @@index([publishedAt])
   @@index([slug])
-  @@index([tags])
 }
 
-model PostProduct {
-  id            String    @id @default(uuid())
-  postId        String
-  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  
-  // 상품 정보
-  productId     String    // 외부 파트너스 상품 ID
-  source        String    // "coupang" | "naver" | "internal"
-  
-  // 캐시된 상품 정보 (API 호출 최소화)
-  name          String
-  image         String?
-  price         Int?
-  currency      String    @default("KRW")
-  originalUrl   String    // 원본 URL
-  affiliateUrl  String    // 파트너스 링크 (수익 발생)
-  
-  // 본문 내 위치 (순서)
-  position      Int       @default(0)
-  
-  // 캐시 상태
-  lastFetchedAt DateTime  @default(now())  // 마지막 API 호출 시간
-  fetchStatus   String    @default("SUCCESS")  // SUCCESS, FAILED, PENDING
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+// Post-FeedTag 연결 테이블
+model PostFeedTag {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  feedTagId String
+  feedTag   FeedTag  @relation(fields: [feedTagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, feedTagId])
   @@index([postId])
-  @@index([source])
-  @@index([updatedAt])  // 캐시 갱신 배치용
-  @@unique([postId, productId, source])  // 같은 글에 같은 상품 중복 방지
+  @@index([feedTagId])
+}
+
+// Post-FreeTag 연결 테이블
+model PostFreeTag {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  freeTagId String
+  freeTag   FreeTag  @relation(fields: [freeTagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, freeTagId])
+  @@index([postId])
+  @@index([freeTagId])
 }
 
 model PostLike {
@@ -414,424 +238,324 @@ model PostLike {
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime @default(now())
-  
-  @@unique([postId, userId])  // 한 유저가 같은 글에 중복 좋아요 방지
+
+  @@unique([postId, userId])
   @@index([postId])
   @@index([userId])
 }
 
-// ==================== GROOVER CODE LOG ====================
-model GrooverCodeLog {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  version     Int      @default(1)
-  encodedData String   @map("encoded_data")
-  checksum    String
-  creatorId   String?  @map("creator_id")
-  itemCount   Int      @map("item_count")
-  totalPrice  Int      @map("total_price")
-  decodeCount Int      @default(0) @map("decode_count")
-  saveCount   Int      @default(0) @map("save_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-  expiresAt   DateTime @map("expires_at")
-  
-  @@index([code])
-  @@index([createdAt])
-  @@map("groover_code_logs")
+model PostShare {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String?
+  platform  String?
+  createdAt DateTime @default(now())
+
+  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+  @@index([userId])
 }
 
-// ==================== LOGGING ====================
-model UsageLog {
+// ==================== COMMENT ====================
+model Comment {
   id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  action    String   // "RECOMMEND", "DECODE", "SAVE_CART", "CLICK_LINK" 등
-  metadata  Json?
-  ipAddress String?  @map("ip_address")
-  userAgent String?  @map("user_agent")
-  createdAt DateTime @default(now()) @map("created_at")
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+  content   String
+  parentId  String?  // 대댓글용
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  
+  likeCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
   @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("usage_logs")
+  @@index([parentId])
 }
 
-model AiCallLog {
-  id               String   @id @default(uuid())
-  userId           String?  @map("user_id")
-  recommendationId String?  @map("recommendation_id")
-  provider         String   // "CLAUDE", "OPENAI" 등
-  model            String
-  promptHash       String   @map("prompt_hash")
-  inputTokens      Int      @map("input_tokens")
-  outputTokens     Int      @map("output_tokens")
-  totalTokens      Int      @map("total_tokens")
-  costUsd          Float?   @map("cost_usd")
-  latencyMs        Int      @map("latency_ms")
-  success          Boolean
-  errorMessage     String?  @map("error_message")
-  cacheHit         Boolean  @default(false) @map("cache_hit")
-  createdAt        DateTime @default(now()) @map("created_at")
+// ==================== DISCUSSION (토론방) ====================
+model Discussion {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@index([promptHash])
+  title       String
+  content     String
+  
+  // 연결된 피드태그
+  feedTagId   String?
+  feedTag     FeedTag? @relation(fields: [feedTagId], references: [id], onDelete: SetNull)
+  
+  // 투표 옵션 (선택)
+  hasVote     Boolean  @default(false)
+  voteOptions Json?    // ["옵션1", "옵션2", ...]
+  
+  // 통계
+  viewCount   Int      @default(0)
+  commentCount Int     @default(0)
+  voteCount   Int      @default(0)
+  
+  // 상태
+  status      String   @default("ACTIVE")  // ACTIVE, CLOSED, HIDDEN
+  closedAt    DateTime?
+  
+  // 관계
+  comments    DiscussionComment[]
+  votes       DiscussionVote[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([userId])
+  @@index([feedTagId])
+  @@index([status])
   @@index([createdAt])
-  @@map("ai_call_logs")
 }
 
-// ==================== CACHE ====================
-model RecommendationCache {
-  id            String   @id @default(uuid())
-  cacheKey      String   @unique @map("cache_key")
-  resultPayload Json     @map("result_payload")
-  hitCount      Int      @default(0) @map("hit_count")
-  createdAt     DateTime @default(now()) @map("created_at")
-  expiresAt     DateTime @map("expires_at")
+model DiscussionComment {
+  id           String     @id @default(uuid())
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@index([cacheKey])
-  @@index([expiresAt])
-  @@map("recommendation_cache")
-}
-// ============================================
-// DM (Direct Message) Models
-// ============================================
+  content      String
+  parentId     String?
+  parent       DiscussionComment?  @relation("DiscussionReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      DiscussionComment[] @relation("DiscussionReplies")
+  
+  likeCount    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
+  @@index([discussionId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model DiscussionVote {
+  id           String     @id @default(uuid())
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  optionIndex  Int        // 투표한 옵션 인덱스
+  createdAt    DateTime   @default(now())
+
+  @@unique([discussionId, userId])  // 한 유저 한 토론에 한 표
+  @@index([discussionId])
+}
+
+// ==================== DM ====================
 model DmThread {
   id              String    @id @default(uuid())
-  
-  // 참여자 (항상 user1Id < user2Id 로 정렬하여 중복 방지)
   user1Id         String
   user1           User      @relation("DmThreadUser1", fields: [user1Id], references: [id], onDelete: Cascade)
   user2Id         String
   user2           User      @relation("DmThreadUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  
-  // 마지막 메시지 캐시 (리스트 조회 최적화)
+
   lastMessage     String?
   lastMessageAt   DateTime?
-  
-  // 안읽음 카운트
-  unreadCountUser1  Int     @default(0)
-  unreadCountUser2  Int     @default(0)
-  
-  // 메시지 관계
+  unreadCountUser1 Int      @default(0)
+  unreadCountUser2 Int      @default(0)
+
   messages        DmMessage[]
-  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  
-  @@unique([user1Id, user2Id])  // 같은 두 사용자 간 스레드 중복 방지
+
+  @@unique([user1Id, user2Id])
   @@index([user1Id])
   @@index([user2Id])
   @@index([lastMessageAt])
-
-  adProposals          AdProposal[]
 }
 
 model DmMessage {
-  id            String    @id @default(uuid())
-  
-  threadId      String
-  thread        DmThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  
-  senderId      String
-  sender        User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  
-  // 메시지 내용
-  content       String
-  messageType   String    @default("text")  // text, image, link, system
-  
-  // 메타데이터 (이미지 URL, 링크 미리보기 등)
-  metadata      Json?
-  
-  // 읽음 상태
-  isRead        Boolean   @default(false)
-  readAt        DateTime?
-  
-  createdAt     DateTime  @default(now())
-  
-  // 신고 관계
-  reports       DmReport[]
-  
+  id          String    @id @default(uuid())
+  threadId    String
+  thread      DmThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  content     String
+  messageType String    @default("text")
+  metadata    Json?
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  reports     DmReport[]
+
   @@index([threadId])
   @@index([senderId])
   @@index([createdAt])
 }
 
 model DmBlock {
-  id          String    @id @default(uuid())
-  
-  blockerId   String
-  blocker     User      @relation("DmBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  
-  blockedId   String
-  blocked     User      @relation("DmBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime  @default(now())
-  
-  @@unique([blockerId, blockedId])  // 중복 차단 방지
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("DmBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("DmBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
   @@index([blockerId])
   @@index([blockedId])
 }
 
 model DmReport {
-  id          String    @id @default(uuid())
-  
-  reporterId  String
-  reporter    User      @relation("DmReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  
-  reportedId  String
-  reported    User      @relation("DmReported", fields: [reportedId], references: [id], onDelete: Cascade)
-  
-  messageId   String?
-  message     DmMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-  
-  reason      String
-  status      String    @default("PENDING")  // PENDING, REVIEWED, RESOLVED, DISMISSED
-  
-  createdAt   DateTime  @default(now())
-  reviewedAt  DateTime?
-  
+  id         String     @id @default(uuid())
+  reporterId String
+  reporter   User       @relation("DmReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedId String
+  reported   User       @relation("DmReported", fields: [reportedId], references: [id], onDelete: Cascade)
+  messageId  String?
+  message    DmMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  reason     String
+  status     String     @default("PENDING")
+  createdAt  DateTime   @default(now())
+  reviewedAt DateTime?
+
   @@index([reporterId])
   @@index([reportedId])
   @@index([status])
 }
-// 광고 제안 (DM 기반)
-model AdProposal {
-  id              String    @id @default(uuid())
-  
-  // 광고주 → 유저
-  advertiserId    String
-  advertiser      User      @relation("AdProposalAdvertiser", fields: [advertiserId], references: [id], onDelete: Cascade)
-  
-  creatorId       String
-  creator         User      @relation("AdProposalCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-  
-  // DM 스레드 연결 (선택)
-  threadId        String?
-  thread          DmThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
-  
-  // 제안 내용
-  title           String              // 광고 제목
-  description     String              // 상세 설명
-  budget          Int                 // 광고비 (원)
-  requirements    String?             // 요구사항
-  deadline        DateTime?           // 마감일
-  
-  // 상태
-  status          AdProposalStatus    @default(PENDING)
-  
-  // 결제/정산 연결
-  payment         AdPayment?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  respondedAt     DateTime?           // 수락/거절 시간
-  
-  @@index([advertiserId])
-  @@index([creatorId])
-  @@index([status])
+
+// ==================== NOTIFICATION ====================
+enum NotificationType {
+  NEW_FOLLOWER
+  POST_LIKED
+  POST_COMMENTED
+  DISCUSSION_REPLY
+  NEW_MESSAGE
+  TAG_NEW_POST
+  SYSTEM_NOTICE
+  WARNING_RECEIVED
 }
 
-enum AdProposalStatus {
-  PENDING       // 대기중
-  ACCEPTED      // 수락됨
-  REJECTED      // 거절됨
-  PAID          // 결제완료
-  IN_PROGRESS   // 진행중
-  COMPLETED     // 완료
-  CANCELLED     // 취소
-  DISPUTED      // 분쟁중
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  type       NotificationType
+  title      String
+  message    String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }
 
-// 광고비 결제
-model AdPayment {
-  id              String    @id @default(uuid())
-  
-  proposalId      String    @unique
-  proposal        AdProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  
-  // 결제자 (광고주)
-  payerId         String
-  payer           User      @relation(fields: [payerId], references: [id], onDelete: Cascade)
-  
-  // 금액
-  amount          Int                 // 총 결제액
-  platformFee     Int                 // 플랫폼 수수료 (15%)
-  creatorAmount   Int                 // 크리에이터 수령액
-  feeRate         Float     @default(0.15)  // 수수료율
-  
-  // 토스페이먼츠
-  tossPaymentKey  String?             // 토스 결제키
-  tossOrderId     String    @unique   // 주문 ID
-  method          String?             // 카드, 계좌이체 등
-  
-  // 상태
-  status          PaymentStatus @default(PENDING)
-  
-  // 정산 연결
-  settlement      Settlement?
-  
-  createdAt       DateTime  @default(now())
-  paidAt          DateTime?
-  cancelledAt     DateTime?
-  
-  @@index([payerId])
-  @@index([status])
-}
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  deviceId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-enum PaymentStatus {
-  PENDING       // 대기
-  COMPLETED     // 완료
-  CANCELLED     // 취소
-  REFUNDED      // 환불
-  FAILED        // 실패
-}
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-// 유저 지갑
-model Wallet {
-  id              String    @id @default(uuid())
-  
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // 잔액
-  balance         Int       @default(0)       // 현재 잔액
-  pendingBalance  Int       @default(0)       // 정산 대기 금액
-  totalEarned     Int       @default(0)       // 누적 수익
-  totalWithdrawn  Int       @default(0)       // 누적 출금
-  
-  // KYC (계좌인증)
-  isVerified      Boolean   @default(false)
-  bankName        String?                     // 은행명
-  bankAccount     String?                     // 계좌번호 (암호화)
-  accountHolder   String?                     // 예금주
-  verifiedAt      DateTime?
-  
-  // 거래 내역
-  transactions    WalletTransaction[]
-  withdrawals     Withdrawal[]
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
-// 지갑 거래 내역
-model WalletTransaction {
-  id              String    @id @default(uuid())
-  
-  walletId        String
-  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  
-  type            TransactionType
-  amount          Int                         // 금액 (+/-)
-  balance         Int                         // 거래 후 잔액
-  
-  // 관련 정보
-  description     String
-  referenceId     String?                     // 관련 ID (결제ID, 출금ID 등)
-  referenceType   String?                     // PAYMENT, WITHDRAWAL, ADJUSTMENT
-  
-  createdAt       DateTime  @default(now())
-  
-  @@index([walletId])
-  @@index([createdAt])
-}
-
-enum TransactionType {
-  EARNING       // 수익 (광고비 수령)
-  WITHDRAWAL    // 출금
-  REFUND        // 환불
-  ADJUSTMENT    // 조정
-  AD_REWARD  
-}
-
-// 정산
-model Settlement {
-  id              String    @id @default(uuid())
-  
-  paymentId       String    @unique
-  payment         AdPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  
-  // 수령자
-  recipientId     String
-  recipient       User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-  
-  amount          Int                         // 정산 금액
-  status          SettlementStatus @default(PENDING)
-  
-  // 정산 완료 시
-  settledAt       DateTime?
-  
-  createdAt       DateTime  @default(now())
-  
-  @@index([recipientId])
-  @@index([status])
-}
-
-enum SettlementStatus {
-  PENDING       // 대기 (작업 완료 전)
-  READY         // 정산 가능
-  COMPLETED     // 지갑에 입금됨
-  FAILED        // 실패
-}
-
-// 출금 요청
-model Withdrawal {
-  id              String    @id @default(uuid())
-  
-  walletId        String
-  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  amount          Int                         // 출금 금액
-  fee             Int       @default(0)       // 출금 수수료
-  netAmount       Int                         // 실수령액
-  
-  // 계좌 정보 (출금 시점 스냅샷)
-  bankName        String
-  bankAccount     String
-  accountHolder   String
-  
-  status          WithdrawalStatus @default(PENDING)
-  
-  // 처리 정보
-  processedAt     DateTime?
-  rejectedReason  String?
-  
-  createdAt       DateTime  @default(now())
-  
-  @@index([walletId])
   @@index([userId])
-  @@index([status])
 }
 
-enum WithdrawalStatus {
-  PENDING       // 대기
-  PROCESSING    // 처리중
-  COMPLETED     // 완료
-  REJECTED      // 거절
-  FAILED        // 실패
-}
-// ============================================
-// 직거래 방지 시스템
-// ============================================
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String
+  device    String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-model DirectTradeAttempt {
-  id               String   @id @default(cuid())
-  userId           String
-  threadId         String?
-  originalContent  String   @db.Text
-  detectedPatterns Json
-  detectedTypes    Json
-  createdAt        DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+// ==================== AUTH ====================
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  email     String
+  expiresAt DateTime
+  used      Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ==================== SEARCH ====================
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  type      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([query])
+}
+
+model PopularSearch {
+  id        String   @id @default(cuid())
+  query     String   @unique
+  count     Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@index([count(sort: Desc)])
+}
+
+// ==================== LOGGING ====================
+model EventLog {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  targetId  String?
+  keyword   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
-  @@index([userId])
+  @@index([userId, type])
   @@index([createdAt])
 }
 
@@ -849,328 +573,28 @@ model UserWarning {
 }
 
 enum WarningType {
-  DIRECT_TRADE_ATTEMPT
   SPAM
   ABUSE
   SCAM
   OTHER
 }
 
-// ============================================
-// 에스크로 시스템
-// ============================================
-
-enum AdDealStatus {
-  PROPOSED
-  ACCEPTED
-  PAID
-  SUBMITTED
-  CONFIRMED
-  SETTLED
-  REJECTED
-  CANCELLED
-  REFUNDED
-  EXPIRED
-}
-
-model AdDeal {
-  id              String        @id @default(cuid())
-  advertiserId    String
-  creatorId       String
-  conversationId  String?
-  title           String
-  description     String?       @db.Text
-  requirements    String?       @db.Text
-  totalAmount     Int
-  platformFee     Int
-  creatorAmount   Int
-  status          AdDealStatus  @default(PROPOSED)
-  escrowAmount    Int?
-  paymentId       String?
-  paidAt          DateTime?
-  submittedAt     DateTime?
-  submissionUrl   String?
-  submissionNote  String?
-  confirmedAt     DateTime?
-  settledAt       DateTime?
-  submitDeadline  DateTime?
-  confirmDeadline DateTime?
-  refundedAt      DateTime?
-  refundReason    String?
-  cancelledAt     DateTime?
-  cancelReason    String?
-  rejectedAt      DateTime?
-  rejectReason    String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  advertiser User        @relation("AdvertiserDeals", fields: [advertiserId], references: [id])
-  creator    User        @relation("CreatorDeals", fields: [creatorId], references: [id])
-  escrowLogs EscrowLog[]
-
-  @@index([advertiserId])
-  @@index([creatorId])
-  @@index([status])
-}
-
-model EscrowLog {
-  id          String   @id @default(cuid())
-  dealId      String
-  action      String
-  fromStatus  String?
-  toStatus    String
-  amount      Int?
-  note        String?
-  performedBy String?
-  createdAt   DateTime @default(now())
-
-  deal AdDeal @relation(fields: [dealId], references: [id])
-
-  @@index([dealId])
-}
-
-// 유저 글 열람 히스토리 (추천용)
-model UserPostHistory {
-  id        String   @id @default(uuid())
-  userId    String
-  postId    String
-  viewedAt  DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, postId])
-  @@index([userId])
-  @@index([postId])
-}
-// 이벤트 로그 (모든 유저 활동 기록)
-model EventLog {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String   // search, view, cart_add, post_write, ad_impression, ad_click
-  targetId  String?  // productId, postId, adId 등
-  keyword   String?  // 검색어 (search 타입일 때)
-  metadata  Json?    // 추가 데이터
-  createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id])
-  
-  @@index([userId, type])
-  @@index([createdAt])
-}
-
-// 일별 통계 (집계 테이블)
-model DailyStat {
-  id            String   @id @default(cuid())
-  userId        String
-  date          DateTime @db.Date
-  pageViews     Int      @default(0)
-  postViews     Int      @default(0)  // 내 글 조회수
-  adImpressions Int      @default(0)
-  adClicks      Int      @default(0)
-  partnerClicks Int      @default(0)
-  
-  user User @relation(fields: [userId], references: [id])
-  
-  @@unique([userId, date])
-}
-
-// ============================================
-// 2. 유저 통계 캐시 테이블 (기존 DailyStat 확장)
-// ============================================
-
-model UserStatsCache {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  
-  // 7일 통계 (캐시)
-  views7d         Int      @default(0)
-  clicks7d        Int      @default(0)
-  earnings7d      Int      @default(0)
-  
-  // 30일 통계 (캐시)
-  views30d        Int      @default(0)
-  clicks30d       Int      @default(0)
-  earnings30d     Int      @default(0)
-  
-  // 전체 통계 (캐시)
-  totalViews      Int      @default(0)
-  totalClicks     Int      @default(0)
-  totalEarnings   Int      @default(0)
-  
-  // 거래 통계
-  activeDeals     Int      @default(0)
-  completedDeals  Int      @default(0)
-  pendingProposals Int     @default(0)
-  
-  // 지갑 스냅샷
-  walletBalance   Int      @default(0)
-  pendingBalance  Int      @default(0)
-  
-  // 캐시 갱신 시간
-  updatedAt       DateTime @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([updatedAt])
-}
-
-// ============================================
-// 3. 관리자 액션 로그
-// ============================================
-
 model AdminActionLog {
-  id          String   @id @default(cuid())
-  
-  adminId     String
-  admin       User     @relation("AdminActions", fields: [adminId], references: [id])
-  
-  action      String   // suspend_user, unsuspend_user, warn_user, process_report, etc.
-  targetType  String?  // user, report, deal
-  targetId    String?
-  
-  // 변경 전/후 데이터
-  beforeData  Json?
-  afterData   Json?
-  
-  // 추가 정보
-  reason      String?
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime @default(now())
-  
+  id         String   @id @default(cuid())
+  adminId    String
+  admin      User     @relation("AdminActions", fields: [adminId], references: [id])
+  action     String
+  targetType String?
+  targetId   String?
+  beforeData Json?
+  afterData  Json?
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
   @@index([adminId])
   @@index([action])
   @@index([targetType, targetId])
   @@index([createdAt])
-}
-// prisma/schema.prisma 맨 아래에 추가
-
-// ============================================
-// 알림 타입
-// ============================================
-enum NotificationType {
-  DEAL_PROPOSED
-  DEAL_ACCEPTED
-  DEAL_REJECTED
-  DEAL_PAID
-  DEAL_SUBMITTED
-  DEAL_CONFIRMED
-  DEAL_SETTLED
-  DEAL_DEADLINE
-  NEW_MESSAGE
-  SYSTEM_NOTICE
-  WARNING_RECEIVED
-  SUSPENSION_NOTICE
-  WITHDRAWAL_COMPLETE
-}
-
-// ============================================
-// 알림
-// ============================================
-model Notification {
-  id          String           @id @default(cuid())
-  userId      String
-  type        NotificationType
-  title       String
-  message     String
-  targetType  String?
-  targetId    String?
-  metadata    Json?
-  isRead      Boolean          @default(false)
-  readAt      DateTime?
-  isPushed    Boolean          @default(false)
-  pushedAt    DateTime?
-  createdAt   DateTime         @default(now())
-  
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId, isRead])
-  @@index([userId, createdAt])
-}
-
-// ============================================
-// 푸시 토큰
-// ============================================
-model PushToken {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  platform    String
-  deviceId    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-}
-
-// ============================================
-// 검색 히스토리 (새로 추가)
-// ============================================
-model SearchHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  query     String
-  type      String?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt(sort: Desc)])
-  @@index([query])
-}
-
-// ============================================
-// 인기 검색어 (새로 추가)
-// ============================================
-model PopularSearch {
-  id        String   @id @default(cuid())
-  query     String   @unique
-  count     Int      @default(1)
-  updatedAt DateTime @updatedAt
-
-  @@index([count(sort: Desc)])
-}
-
-model PostShare {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String?
-  platform  String?
-  createdAt DateTime @default(now())
-
-  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([postId, createdAt(sort: Desc)])
-  @@index([userId])
-}
-model RefreshToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([expiresAt])
-}
-model FcmToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String
-  device    String   @default("web")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, token])
-  @@index([userId])
 }
