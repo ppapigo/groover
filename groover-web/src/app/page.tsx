@@ -1,20 +1,15 @@
 // src/app/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 
-const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '반려동물', '인테리어', '운동', '자동차'];
+const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
 
 export default function HomePage() {
   const { posts, isLoading, fetchPosts } = useFeed({});
-  const [discussions] = useState([
-    { id: 1, title: '요즘 공기청정기 뭐가 좋아요?', replies: 24, tag: '가전' },
-    { id: 2, title: '캠핑 입문자 장비 추천', replies: 18, tag: '캠핑' },
-    { id: 3, title: '아기 이유식 브랜드 추천해주세요', replies: 31, tag: '육아' },
-  ]);
 
   useEffect(() => {
     fetchPosts(null);
@@ -24,18 +19,16 @@ export default function HomePage() {
     <>
       <AppHeader />
       <div className="home-page">
-        {/* 히어로 섹션 */}
         <section className="hero-section">
           <h1>쇼핑 리뷰 커뮤니티</h1>
           <p>솔직한 리뷰와 추천을 공유하세요</p>
           <Link href="/write" className="cta-btn">
-            ✏️ 글 쓰기
+            글 쓰기
           </Link>
         </section>
 
-        {/* 추천 태그 */}
         <section className="tags-section">
-          <h2>🔥 지금 뜨는 태그</h2>
+          <h2>지금 뜨는 태그</h2>
           <div className="tag-chips">
             {trendingTags.map((tag) => (
               <Link key={tag} href={`/blog?tag=${tag}`} className="tag-chip">
@@ -45,12 +38,11 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 블로그 피드 프리뷰 */}
         <section className="feed-section">
           <div className="section-header">
-            <h2>📝 최신 리뷰</h2>
+            <h2>최신 리뷰</h2>
             <Link href="/blog" className="more-link">
-              더 보기 →
+              더 보기
             </Link>
           </div>
 
@@ -64,21 +56,17 @@ export default function HomePage() {
                 <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
                   <div className="post-thumb-wrapper">
                     {post.previewImage ? (
-                      <img
-                        className="post-thumb"
-                        src={post.previewImage}
-                        alt={post.title}
-                      />
+                      <img className="post-thumb" src={post.previewImage} alt={post.title} />
                     ) : (
-                      <div className="post-thumb-placeholder">📷</div>
+                      <div className="post-thumb-placeholder">이미지 없음</div>
                     )}
                   </div>
                   <div className="post-info">
                     <h3>{post.title}</h3>
                     <div className="post-meta">
                       <span>{post.author?.name}</span>
-                      <span>👁 {post.viewCount}</span>
-                      <span>❤️ {post.likeCount}</span>
+                      <span>조회 {post.viewCount}</span>
+                      <span>좋아요 {post.likeCount}</span>
                     </div>
                   </div>
                 </Link>
@@ -95,33 +83,12 @@ export default function HomePage() {
             </div>
           )}
         </section>
-
-        {/* 토론방 프리뷰 */}
-        <section className="discussion-section">
-          <div className="section-header">
-            <h2>💬 지금 뜨는 토론</h2>
-            <Link href="/discussions" className="more-link">
-              토론방 가기 →
-            </Link>
-          </div>
-          <div className="discussion-list">
-            {discussions.map((d) => (
-              <Link key={d.id} href={`/discussions/${d.id}`} className="discussion-card">
-                <span className="discussion-tag">#{d.tag}</span>
-                <h3>{d.title}</h3>
-                <span className="discussion-replies">💬 {d.replies}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
       </div>
 
       <style jsx>{`
         .home-page {
           padding-bottom: 80px;
         }
-
-        /* 히어로 */
         .hero-section {
           text-align: center;
           padding: 40px 20px;
@@ -146,8 +113,6 @@ export default function HomePage() {
           font-weight: 600;
           text-decoration: none;
         }
-
-        /* 태그 섹션 */
         .tags-section {
           padding: 20px;
         }
@@ -173,8 +138,6 @@ export default function HomePage() {
           background: #667eea;
           color: white;
         }
-
-        /* 피드 섹션 */
         .feed-section {
           padding: 20px;
         }
@@ -222,7 +185,8 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 24px;
+          font-size: 14px;
+          color: #999;
         }
         .post-info {
           padding: 12px;
@@ -240,45 +204,6 @@ export default function HomePage() {
           font-size: 11px;
           color: #888;
         }
-
-        /* 토론 섹션 */
-        .discussion-section {
-          padding: 20px;
-          background: #f8f9fa;
-        }
-        .discussion-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .discussion-card {
-          background: white;
-          padding: 14px;
-          border-radius: 10px;
-          text-decoration: none;
-          color: inherit;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .discussion-tag {
-          font-size: 12px;
-          color: #667eea;
-          background: #f0f0ff;
-          padding: 4px 8px;
-          border-radius: 4px;
-        }
-        .discussion-card h3 {
-          flex: 1;
-          font-size: 14px;
-          font-weight: 500;
-        }
-        .discussion-replies {
-          font-size: 12px;
-          color: #888;
-        }
-
-        /* 공통 */
         .loading {
           display: flex;
           justify-content: center;
