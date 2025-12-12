@@ -84,7 +84,7 @@ export default function ProfilePage() {
           </Link>
         </div>
 
-        {/* 통계 */}
+        {/* 통계 - 게시글, 팔로워, 팔로잉 */}
         <div
           style={{
             display: 'grid',
@@ -103,33 +103,36 @@ export default function ProfilePage() {
           </div>
           <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '12px' }}>
             <p style={{ fontSize: '20px', fontWeight: '700' }}>0</p>
-            <p style={{ fontSize: '12px', color: '#666' }}>수익</p>
+            <p style={{ fontSize: '12px', color: '#666' }}>팔로잉</p>
           </div>
         </div>
 
-        {/* 수익 관리 섹션 */}
-        
+        {/* 내 정보 섹션 */}
         <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginBottom: '10px' }}>
-          💰 수익 관리
+          📋 내 정보
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
           <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>📊</span>
-            <span style={{ flex: 1, fontSize: '14px' }}>대시보드</span>
+            <span style={{ flex: 1, fontSize: '14px' }}>내 대시보드</span>
             <span style={{ color: '#ccc' }}>›</span>
           </Link>
-          <Link href="/wallet" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
-            <span style={{ fontSize: '20px' }}>💳</span>
+          {/* 비활성화된 메뉴들 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '12px', color: '#bbb', cursor: 'not-allowed' }}>
+            <span style={{ fontSize: '20px' }}>💰</span>
             <span style={{ flex: 1, fontSize: '14px' }}>내 지갑</span>
-          </Link>
-          <Link href="/profile/ads" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '11px', color: '#aaa' }}>준비 중</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '12px', color: '#bbb', cursor: 'not-allowed' }}>
             <span style={{ fontSize: '20px' }}>📢</span>
             <span style={{ flex: 1, fontSize: '14px' }}>광고 제안 관리</span>
-          </Link>
-          <Link href="/profile/bank" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+            <span style={{ fontSize: '11px', color: '#aaa' }}>준비 중</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '12px', color: '#bbb', cursor: 'not-allowed' }}>
             <span style={{ fontSize: '20px' }}>🏦</span>
             <span style={{ flex: 1, fontSize: '14px' }}>정산 계좌 관리</span>
-          </Link>
+            <span style={{ fontSize: '11px', color: '#aaa' }}>준비 중</span>
+          </div>
         </div>
 
         {/* 콘텐츠 섹션 */}
@@ -140,14 +143,17 @@ export default function ProfilePage() {
           <Link href="/profile/posts" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>📄</span>
             <span style={{ flex: 1, fontSize: '14px' }}>내 게시글</span>
+            <span style={{ color: '#ccc' }}>›</span>
           </Link>
           <Link href="/profile/drafts" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>✏️</span>
             <span style={{ flex: 1, fontSize: '14px' }}>임시 저장</span>
+            <span style={{ color: '#ccc' }}>›</span>
           </Link>
           <Link href="/profile/likes" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>❤️</span>
             <span style={{ flex: 1, fontSize: '14px' }}>좋아요한 글</span>
+            <span style={{ color: '#ccc' }}>›</span>
           </Link>
         </div>
 
@@ -159,6 +165,7 @@ export default function ProfilePage() {
           <Link href="/messages" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <span style={{ fontSize: '20px' }}>💬</span>
             <span style={{ flex: 1, fontSize: '14px' }}>메시지</span>
+            <span style={{ color: '#ccc' }}>›</span>
           </Link>
         </div>
 
@@ -178,7 +185,7 @@ export default function ProfilePage() {
             <span style={{ color: '#ccc' }}>›</span>
           </Link>
           <Link href="/terms" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
-            <span style={{ fontSize: '20px' }}>📋</span>
+            <span style={{ fontSize: '20px' }}>📜</span>
             <span style={{ flex: 1, fontSize: '14px' }}>이용약관</span>
             <span style={{ color: '#ccc' }}>›</span>
           </Link>
