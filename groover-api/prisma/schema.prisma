@@ -41,6 +41,7 @@ model User {
   postLikes         PostLike[]
   postShares        PostShare[]
   comments          Comment[]
+postHistories UserPostHistory[]
   
   // 태그 시스템
   pinnedTags        UserPinnedTag[]
@@ -194,6 +195,7 @@ model Post {
   likes         PostLike[]
   shares        PostShare[]
   comments      Comment[]
+viewHistories UserPostHistory[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -203,7 +205,19 @@ model Post {
   @@index([publishedAt])
   @@index([slug])
 }
+model UserPostHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String
+  viewedAt  DateTime @default(now())
 
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
 // Post-FeedTag 연결 테이블
 model PostFeedTag {
   id        String   @id @default(uuid())

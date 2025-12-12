@@ -2,12 +2,8 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { BlogController } from './blog.controller';
-import { ProductClickController } from './product-click.controller';
 import { ImageUploadController } from './image-upload.controller';
 import { BlogService } from './blog.service';
-import { ProductLinkParserService } from './services/product-link-parser.service';
-import { AffiliateService } from './services/affiliate.service';
-import { DisclaimerService } from './services/disclaimer.service';
 import { ImageUploadService } from './services/image-upload.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -19,12 +15,9 @@ import { PrismaModule } from '../prisma/prisma.module';
       maxRedirects: 5,
     }),
   ],
-  controllers: [BlogController, ProductClickController, ImageUploadController],
+  controllers: [BlogController, ImageUploadController],
   providers: [
     BlogService,
-    ProductLinkParserService,
-    AffiliateService,
-    DisclaimerService,
     ImageUploadService,
   ],
   exports: [BlogService],

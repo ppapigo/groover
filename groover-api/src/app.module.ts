@@ -12,14 +12,11 @@ import { AuthModule } from './auth/auth.module';
 // Feature Modules
 import { BlogModule } from './blog/blog.module';
 import { DmModule } from './dm/dm.module';
-import { EscrowModule } from './escrow/escrow.module';
-import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notification/notification.module';
 import { SearchModule } from './search/search.module';
 import { UsersModule } from './users/users.module';
-import { WalletModule } from './wallet/wallet.module';
-
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -45,21 +42,17 @@ import { WalletModule } from './wallet/wallet.module';
         limit: 100,
       },
     ]),
-    
     // Core
     PrismaModule,
     AuthModule,
-    
     // Features
     BlogModule,
     DmModule,
-    EscrowModule,
-    DashboardModule,
     AdminModule,
     NotificationModule,
     SearchModule,
     UsersModule,
-    WalletModule,
+    TagsModule,
   ],
   providers: [
     {
