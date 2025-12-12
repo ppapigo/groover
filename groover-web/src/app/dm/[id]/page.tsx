@@ -3,73 +3,36 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { ChevronLeft, MoreVertical, Plus, Send } from 'lucide-react';
 import DmMenu from '@/components/dm/DmMenu';
 import ReportModal from '@/components/dm/ReportModal';
-import AdProposalCard from '@/components/dm/AdProposalCard';
 
 interface Message {
   id: string;
-  role: 'me' | 'other' | 'proposal';
+  role: 'me' | 'other';
   text: string;
   time: string;
-  proposal?: {
-    id: string;
-    advertiser: string;
-    title: string;
-    amount: number;
-    description?: string;
-    status: 'pending' | 'accepted' | 'rejected' | 'completed';
-  };
 }
 
 const partner = {
   id: '1',
-  name: '뷰티브랜드A',
+  name: '쇼핑러버',
   isBlocked: false,
   profileImage: '',
 };
 
 const mockMessages: Message[] = [
-  { id: '1', role: 'other', text: '안녕하세요! 뷰티브랜드A입니다.', time: '14:00' },
-  { id: '2', role: 'other', text: '작성해주신 스킨케어 리뷰 글을 보고 연락드립니다.', time: '14:01' },
+  { id: '1', role: 'other', text: '안녕하세요! 쇼핑러버입니다.', time: '14:00' },
+  { id: '2', role: 'other', text: '작성해주신 리뷰 글 보고 연락드렸어요.', time: '14:01' },
   { id: '3', role: 'me', text: '안녕하세요! 어떤 내용인가요?', time: '14:05' },
-  {
-    id: '4',
-    role: 'proposal',
-    text: '',
-    time: '14:10',
-    proposal: {
-      id: 'prop-1',
-      advertiser: '뷰티브랜드A',
-      title: '신제품 세럼 리뷰',
-      description: '저희 신제품 히알루론산 세럼을 사용하시고 솔직한 리뷰를 작성해주세요.',
-      amount: 100000,
-      status: 'pending',
-    },
-  },
-  { id: '5', role: 'other', text: '제안 상세 내용 확인해주세요! 관심 있으시면 수락 부탁드립니다 😊', time: '14:11' },
+  { id: '4', role: 'other', text: '제품 사용 후기 공유해주실 수 있나요?', time: '14:10' },
 ];
 
-// 메시지 버블 컴포넌트
 interface MessageBubbleProps {
   message: Message;
-  onAcceptProposal?: (id: string) => void;
-  onRejectProposal?: (id: string) => void;
 }
 
-function MessageBubble({ message, onAcceptProposal, onRejectProposal }: MessageBubbleProps) {
-  if (message.role === 'proposal' && message.proposal) {
-    return (
-      <div className="my-3 animate-scale-in">
-        <AdProposalCard
-          proposal={message.proposal}
-          onAccept={onAcceptProposal!}
-          onReject={onRejectProposal!}
-        />
-      </div>
-    );
-  }
-
+function MessageBubble({ message }: MessageBubbleProps) {
   const isMe = message.role === 'me';
 
   return (
@@ -78,8 +41,8 @@ function MessageBubble({ message, onAcceptProposal, onRejectProposal }: MessageB
         <div
           className={`
             px-4 py-2.5 text-[15px] leading-relaxed
-            ${isMe 
-              ? 'bg-primary text-white rounded-[20px] rounded-br-md' 
+            ${isMe
+              ? 'bg-primary text-white rounded-[20px] rounded-br-md'
               : 'bg-card-soft text-text-primary rounded-[20px] rounded-bl-md'
             }
           `}
@@ -109,42 +72,17 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
 
   const sendMessage = () => {
     if (!input.trim() || isBlocked) return;
-    
+
     const newMessage: Message = {
       id: Date.now().toString(),
       role: 'me',
       text: input.trim(),
       time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
     };
-    
+
     setMessages([...messages, newMessage]);
     setInput('');
     inputRef.current?.focus();
-  };
-
-  const handleAcceptProposal = (proposalId: string) => {
-    setMessages(messages.map(msg => {
-      if (msg.proposal?.id === proposalId) {
-        return {
-          ...msg,
-          proposal: { ...msg.proposal, status: 'accepted' as const },
-        };
-      }
-      return msg;
-    }));
-    alert('광고 제안을 수락했습니다! 완료 후 지갑에 정산됩니다.');
-  };
-
-  const handleRejectProposal = (proposalId: string) => {
-    setMessages(messages.map(msg => {
-      if (msg.proposal?.id === proposalId) {
-        return {
-          ...msg,
-          proposal: { ...msg.proposal, status: 'rejected' as const },
-        };
-      }
-      return msg;
-    }));
   };
 
   const handleBlock = () => {
@@ -172,14 +110,12 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
             <Link href="/dm" className="p-2 -ml-2">
-              <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft size={24} />
             </Link>
-            
+
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-full bg-primary-light flex items-center justify-center text-lg">
-                💼
+                👤
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -194,22 +130,14 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowMenu(true)}
-            className="p-2 -mr-2"
-          >
-            <svg className="w-6 h-6 text-text-primary" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="6" r="2" />
-              <circle cx="12" cy="12" r="2" />
-              <circle cx="12" cy="18" r="2" />
-            </svg>
+          <button onClick={() => setShowMenu(true)} className="p-2 -mr-2">
+            <MoreVertical size={24} />
           </button>
         </div>
       </header>
 
       {/* 메시지 영역 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {/* 날짜 구분선 */}
         <div className="flex items-center justify-center my-4">
           <span className="px-3 py-1 bg-card-soft text-text-tertiary text-xs rounded-full">
             오늘
@@ -217,12 +145,7 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         </div>
 
         {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            onAcceptProposal={handleAcceptProposal}
-            onRejectProposal={handleRejectProposal}
-          />
+          <MessageBubble key={msg.id} message={msg} />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -232,12 +155,9 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         <div className="flex-shrink-0 bg-card-soft border-t border-border px-5 py-4 safe-area-pb">
           <div className="text-center">
             <p className="text-sm text-text-secondary mb-3">
-              🚫 이 사용자를 차단했습니다
+              이 사용자를 차단했습니다
             </p>
-            <button
-              onClick={handleUnblock}
-              className="btn-secondary text-sm"
-            >
+            <button onClick={handleUnblock} className="btn-secondary text-sm">
               차단 해제
             </button>
           </div>
@@ -245,14 +165,10 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
       ) : (
         <div className="flex-shrink-0 bg-white border-t border-border px-4 py-3 safe-area-pb">
           <div className="flex items-center gap-2">
-            {/* 추가 기능 버튼 */}
             <button className="w-10 h-10 flex-shrink-0 flex items-center justify-center text-text-tertiary hover:bg-card-soft rounded-full transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus size={24} />
             </button>
 
-            {/* 입력창 */}
             <div className="flex-1 relative">
               <input
                 ref={inputRef}
@@ -265,21 +181,18 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
               />
             </div>
 
-            {/* 전송 버튼 */}
             <button
               onClick={sendMessage}
               disabled={!input.trim()}
               className={`
                 w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center transition-all
-                ${input.trim() 
-                  ? 'bg-primary text-white shadow-sm active:scale-95' 
+                ${input.trim()
+                  ? 'bg-primary text-white shadow-sm active:scale-95'
                   : 'bg-card-soft text-text-tertiary'
                 }
               `}
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
+              <Send size={20} />
             </button>
           </div>
         </div>

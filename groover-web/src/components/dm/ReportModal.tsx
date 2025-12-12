@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface ReportModalProps {
 const reportTypes = [
   { value: 'spam', label: '광고/스팸' },
   { value: 'scam', label: '사기/금전 요구' },
-  { value: 'abuse', label: '욕설/혐오 표현' },
+  { value: 'abuse', label: '욕설/비하 표현' },
   { value: 'other', label: '기타' },
 ];
 
@@ -61,9 +62,12 @@ export default function ReportModal({ isOpen, onClose, targetUser, onSubmit }: R
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
-          🚨 신고하기
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <AlertTriangle size={20} color="#ef4444" />
+          <h3 style={{ fontSize: '18px', fontWeight: '700' }}>
+            신고하기
+          </h3>
+        </div>
         <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>
           {targetUser}님을 신고합니다.
         </p>

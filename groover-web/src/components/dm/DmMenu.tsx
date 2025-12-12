@@ -1,7 +1,7 @@
 // src/components/dm/DmMenu.tsx
 'use client';
 
-import { useState } from 'react';
+import { ShieldOff, ShieldCheck, Flag, X } from 'lucide-react';
 
 interface DmMenuProps {
   isBlocked: boolean;
@@ -27,7 +27,7 @@ export default function DmMenu({ isBlocked, onBlock, onUnblock, onReport, onClos
         }}
         onClick={onClose}
       />
-      
+
       {/* 메뉴 */}
       <div
         style={{
@@ -55,7 +55,7 @@ export default function DmMenu({ isBlocked, onBlock, onUnblock, onReport, onClos
           }}
         />
 
-        {/* 메뉴 항목 */}
+        {/* 메뉴 아이템 */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {isBlocked ? (
             <button
@@ -72,7 +72,7 @@ export default function DmMenu({ isBlocked, onBlock, onUnblock, onReport, onClos
                 gap: '12px',
               }}
             >
-              <span style={{ fontSize: '18px' }}>🔓</span>
+              <ShieldOff size={20} />
               차단 해제
             </button>
           ) : (
@@ -90,7 +90,7 @@ export default function DmMenu({ isBlocked, onBlock, onUnblock, onReport, onClos
                 gap: '12px',
               }}
             >
-              <span style={{ fontSize: '18px' }}>🚫</span>
+              <ShieldCheck size={20} />
               사용자 차단하기
             </button>
           )}
@@ -110,7 +110,7 @@ export default function DmMenu({ isBlocked, onBlock, onUnblock, onReport, onClos
               gap: '12px',
             }}
           >
-            <span style={{ fontSize: '18px' }}>🚨</span>
+            <Flag size={20} />
             신고하기
           </button>
         </div>
