@@ -1,9 +1,7 @@
 // src/blog/services/image-upload.service.ts
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import * as fs from 'fs';
-import * as path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
 import * as crypto from 'crypto';
 
 export interface MulterFile {
@@ -33,12 +31,6 @@ export interface ImageUploadOptions {
 @Injectable()
 export class ImageUploadService {
   private readonly logger = new Logger(ImageUploadService.name);
-  private readonly uploadDir: string;
-  private readonly baseUrl: string;
-  private readonly useS3: boolean;
-  private readonly s3Client: S3Client;
-  private readonly s3Bucket: string;
-  private readonly s3Region: string;
 
   private readonly defaultOptions: ImageUploadOptions = {
     maxSizeBytes: 10 * 1024 * 1024,
@@ -47,25 +39,14 @@ export class ImageUploadService {
   };
 
   constructor(private readonly configService: ConfigService) {
-    this.uploadDir = this.configService.get('UPLOAD_DIR') || './uploads/blog';
-    this.baseUrl = this.configService.get('CDN_BASE_URL') || '/uploads/blog';
-    this.s3Bucket = this.configService.get('AWS_S3_BUCKET') || '';
-    this.s3Region = this.configService.get('AWS_REGION') || 'ap-southeast-2';
-    this.useS3 = !!this.s3Bucket;
+    // Cloudinary 설정
+    cloudinary.config({
+      cloud_name: this.configService.get('CLOUDINARY_CLOUD_NAME'),
+      api_key: this.configService.get('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get('CLOUDINARY_API_SECRET'),
+    });
 
-    if (this.useS3) {
-      this.s3Client = new S3Client({
-        region: this.s3Region,
-        credentials: {
-          accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID') || '',
-          secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY') || '',
-        },
-      });
-      this.logger.log(`S3 업로드 활성화: ${this.s3Bucket}`);
-    } else {
-      this.ensureDirectoryExists(this.uploadDir);
-      this.ensureDirectoryExists(path.join(this.uploadDir, 'thumbnails'));
-    }
+    this.logger.log('Cloudinary 업로드 서비스 초기화 완료');
   }
 
   async uploadImage(
@@ -77,106 +58,74 @@ export class ImageUploadService {
     this.validateFile(file, opts);
 
     const filename = this.generateFilename(file.originalname, userId);
-    const thumbnailFilename = `thumb_${filename}`;
 
-    if (this.useS3) {
-      return this.uploadToS3(file, filename, thumbnailFilename, opts);
-    }
-
-    return this.uploadToLocal(file, filename, thumbnailFilename, opts);
+    return this.uploadToCloudinary(file, filename, opts);
   }
 
-  private async uploadToLocal(
+  private async uploadToCloudinary(
     file: MulterFile,
     filename: string,
-    thumbnailFilename: string,
     options: ImageUploadOptions,
   ): Promise<UploadedImage> {
-    const filePath = path.join(this.uploadDir, filename);
-    const thumbnailPath = path.join(this.uploadDir, 'thumbnails', thumbnailFilename);
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'groover/images',
+          public_id: filename.replace(/\.[^/.]+$/, ''), // 확장자 제거
+          resource_type: 'image',
+          transformation: [
+            { quality: 'auto:good' },
+            { fetch_format: 'auto' },
+          ],
+        },
+        (error, result) => {
+          if (error) {
+            this.logger.error('Cloudinary 업로드 실패:', error);
+            reject(new BadRequestException('이미지 업로드에 실패했습니다.'));
+            return;
+          }
 
-    await fs.promises.writeFile(filePath, file.buffer);
+          if (!result) {
+            reject(new BadRequestException('이미지 업로드 결과가 없습니다.'));
+            return;
+          }
 
-    if (options.generateThumbnail) {
-      await fs.promises.writeFile(thumbnailPath, file.buffer);
-    }
+          // 썸네일 URL 생성 (Cloudinary 변환 사용)
+          const thumbnailUrl = cloudinary.url(result.public_id, {
+            width: 400,
+            height: 300,
+            crop: 'fill',
+            quality: 'auto:good',
+            fetch_format: 'auto',
+          });
 
-    return {
-      url: `${this.baseUrl}/${filename}`,
-      thumbnailUrl: `${this.baseUrl}/thumbnails/${thumbnailFilename}`,
-      size: file.size,
-      mimeType: file.mimetype,
-    };
-  }
-
-  private async uploadToS3(
-    file: MulterFile,
-    filename: string,
-    thumbnailFilename: string,
-    options: ImageUploadOptions,
-  ): Promise<UploadedImage> {
-    const key = `images/${filename}`;
-    const thumbnailKey = `images/thumbnails/${thumbnailFilename}`;
-
-    // 원본 업로드
-    await this.s3Client.send(
-      new PutObjectCommand({
-        Bucket: this.s3Bucket,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      }),
-    );
-
-    // 썸네일 업로드 (현재는 원본 복사)
-    if (options.generateThumbnail) {
-      await this.s3Client.send(
-        new PutObjectCommand({
-          Bucket: this.s3Bucket,
-          Key: thumbnailKey,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        }),
+          resolve({
+            url: result.secure_url,
+            thumbnailUrl: thumbnailUrl,
+            width: result.width,
+            height: result.height,
+            size: result.bytes,
+            mimeType: `image/${result.format}`,
+          });
+        },
       );
-    }
 
-    const baseS3Url = `https://${this.s3Bucket}.s3.${this.s3Region}.amazonaws.com`;
-
-    return {
-      url: `${baseS3Url}/${key}`,
-      thumbnailUrl: `${baseS3Url}/${thumbnailKey}`,
-      size: file.size,
-      mimeType: file.mimetype,
-    };
+      // Buffer를 스트림으로 전송
+      uploadStream.end(file.buffer);
+    });
   }
 
   async deleteImage(imageUrl: string): Promise<void> {
     try {
-      if (this.useS3 && imageUrl.includes(this.s3Bucket)) {
-        const key = imageUrl.split('.amazonaws.com/')[1];
-        if (key) {
-          await this.s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: this.s3Bucket,
-              Key: key,
-            }),
-          );
-        }
-        return;
-      }
-
-      const filename = imageUrl.replace(`${this.baseUrl}/`, '');
-      const filePath = path.join(this.uploadDir, filename);
-      const thumbnailPath = path.join(this.uploadDir, 'thumbnails', `thumb_${filename}`);
-
-      if (fs.existsSync(filePath)) {
-        await fs.promises.unlink(filePath);
-      }
-      if (fs.existsSync(thumbnailPath)) {
-        await fs.promises.unlink(thumbnailPath);
+      // Cloudinary URL에서 public_id 추출
+      const matches = imageUrl.match(/\/groover\/images\/([^/.]+)/);
+      if (matches && matches[1]) {
+        const publicId = `groover/images/${matches[1]}`;
+        await cloudinary.uploader.destroy(publicId);
+        this.logger.log(`이미지 삭제 완료: ${publicId}`);
       }
     } catch (error) {
-      this.logger.error(`Failed to delete image: ${imageUrl}`, error);
+      this.logger.error(`이미지 삭제 실패: ${imageUrl}`, error);
     }
   }
 
@@ -200,15 +149,9 @@ export class ImageUploadService {
   private generateFilename(originalName: string, userId: string): string {
     const timestamp = Date.now();
     const random = crypto.randomBytes(8).toString('hex');
-    const ext = path.extname(originalName).toLowerCase();
+    const ext = originalName.split('.').pop()?.toLowerCase() || 'jpg';
     const userPrefix = userId.slice(0, 8);
     
-    return `${userPrefix}_${timestamp}_${random}${ext}`;
-  }
-
-  private ensureDirectoryExists(dir: string): void {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    return `${userPrefix}_${timestamp}_${random}.${ext}`;
   }
 }
