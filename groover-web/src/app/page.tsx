@@ -3,17 +3,35 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
+import { useAuth } from '@/hooks/useAuth';
+import { Eye, Heart, PenLine } from 'lucide-react';
 
 const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
 
 export default function HomePage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const { posts, isLoading, fetchPosts } = useFeed({});
 
   useEffect(() => {
     fetchPosts(null);
   }, []);
+
+  // 글쓰기 버튼 클릭 핸들러
+  const handleWriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      // 로그인 안 되어있으면 로그인 페이지로
+      if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
+        router.push('/login?redirect=/write');
+      }
+    } else {
+      router.push('/write');
+    }
+  };
 
   return (
     <>
@@ -22,9 +40,10 @@ export default function HomePage() {
         <section className="hero-section">
           <h1>쇼핑 리뷰 커뮤니티</h1>
           <p>솔직한 리뷰와 추천을 공유하세요</p>
-          <Link href="/write" className="cta-btn">
+          <button onClick={handleWriteClick} className="cta-btn">
+            <PenLine size={18} />
             글 쓰기
-          </Link>
+          </button>
         </section>
 
         <section className="tags-section">
@@ -58,15 +77,19 @@ export default function HomePage() {
                     {post.previewImage ? (
                       <img className="post-thumb" src={post.previewImage} alt={post.title} />
                     ) : (
-                      <div className="post-thumb-placeholder">이미지 없음</div>
+                      <div className="post-thumb-placeholder">📝</div>
                     )}
                   </div>
                   <div className="post-info">
                     <h3>{post.title}</h3>
                     <div className="post-meta">
                       <span>{post.author?.name}</span>
-                      <span>조회 {post.viewCount}</span>
-                      <span>좋아요 {post.likeCount}</span>
+                      <span className="meta-item">
+                        <Eye size={12} /> {post.viewCount}
+                      </span>
+                      <span className="meta-item">
+                        <Heart size={12} /> {post.likeCount}
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -77,9 +100,9 @@ export default function HomePage() {
           {!isLoading && (posts || []).length === 0 && (
             <div className="empty-state">
               <p>아직 글이 없습니다</p>
-              <Link href="/write" className="empty-btn">
+              <button onClick={handleWriteClick} className="empty-btn">
                 첫 번째 글 작성하기
-              </Link>
+              </button>
             </div>
           )}
         </section>
@@ -105,13 +128,23 @@ export default function HomePage() {
           margin-bottom: 20px;
         }
         .cta-btn {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
           padding: 12px 24px;
           background: white;
           color: #667eea;
           border-radius: 25px;
           font-weight: 600;
           text-decoration: none;
+          border: none;
+          cursor: pointer;
+          font-size: 15px;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .cta-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         .tags-section {
           padding: 20px;
@@ -185,7 +218,7 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          font-size: 24px;
           color: #999;
         }
         .post-info {
@@ -203,6 +236,11 @@ export default function HomePage() {
           gap: 8px;
           font-size: 11px;
           color: #888;
+        }
+        .meta-item {
+          display: flex;
+          align-items: center;
+          gap: 2px;
         }
         .loading {
           display: flex;
@@ -233,6 +271,9 @@ export default function HomePage() {
           color: white;
           border-radius: 20px;
           text-decoration: none;
+          border: none;
+          cursor: pointer;
+          font-size: 14px;
         }
       `}</style>
     </>

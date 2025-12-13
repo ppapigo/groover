@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
+import { Search, Eye, Heart, Flame } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -37,33 +38,37 @@ export default function SearchPage() {
     return () => clearTimeout(debounce);
   }, [query]);
 
- const handleSearch = async () => {
-  if (!query.trim()) return;
+  const handleSearch = async () => {
+    if (!query.trim()) return;
 
-  setIsLoading(true);
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query.trim())}`
-    );
-    const data = await res.json();
-    if (data.posts) {
-      setResults(data.posts);
-    } else if (data.data?.posts) {
-      setResults(data.data.posts);
-    } else {
-      setResults([]);
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/search?q=${encodeURIComponent(query.trim())}`
+      );
+      const data = await res.json();
+      if (data.posts) {
+        setResults(data.posts);
+      } else if (data.data?.posts) {
+        setResults(data.data.posts);
+      } else {
+        setResults([]);
+      }
+    } catch (err) {
+      console.error('검색 실패:', err);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    console.error('검색 실패:', err);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
+
   return (
     <>
       <AppHeader />
       <div className="search-page">
-        <h2>🔍 검색</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <Search size={24} className="text-primary" />
+          <h2 style={{ margin: 0 }}>검색</h2>
+        </div>
         <p>상품명이나 리뷰 키워드를 검색해보세요</p>
 
         <div className="search-input-wrapper">
@@ -118,8 +123,14 @@ export default function SearchPage() {
                     <p style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
                       {post.excerpt?.slice(0, 50)}...
                     </p>
-                    <div style={{ fontSize: '12px', color: '#999' }}>
-                      {post.author?.name} · 👁 {post.viewCount} · ❤️ {post.likeCount}
+                    <div style={{ fontSize: '12px', color: '#999', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{post.author?.name}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <Eye size={12} /> {post.viewCount}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <Heart size={12} /> {post.likeCount}
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -138,8 +149,9 @@ export default function SearchPage() {
         {/* 인기 검색어 */}
         {!query && (
           <div style={{ marginTop: '32px', textAlign: 'left' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>
-              🔥 인기 검색어
+            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Flame size={16} className="text-orange-500" />
+              인기 검색어
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {['캠핑', '육아', '다이슨', '자취템', '가성비', '겨울옷'].map((keyword) => (

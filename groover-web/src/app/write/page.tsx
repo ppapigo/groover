@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import api from '@/lib/api';
 import imageCompression from 'browser-image-compression';
+import { X, Image, Eye, Tag } from 'lucide-react';
 
 interface PostData {
   title: string;
@@ -15,15 +16,20 @@ interface PostData {
   previewImage: string | null;
 }
 
+interface TagSuggestion {
+  id: string;
+  name: string;
+  useCount: number;
+}
+
 // 마크다운 이미지를 HTML로 변환하는 함수
 const renderMarkdownImages = (text: string) => {
   if (!text) return null;
   
-  // ![alt](url) 패턴을 찾아서 분리
-  const parts = text.split(/(!\\[.*?\\]\\(.*?\\))/g);
+  const parts = text.split(/(!\[.*?\]\(.*?\))/g);
   
   return parts.map((part, index) => {
-    const imageMatch = part.match(/!\\[(.*?)\\]\\((.*?)\\)/);
+    const imageMatch = part.match(/!\[(.*?)\]\((.*?)\)/);
     if (imageMatch) {
       const [, alt, url] = imageMatch;
       return (
@@ -41,7 +47,6 @@ const renderMarkdownImages = (text: string) => {
         />
       );
     }
-    // 일반 텍스트는 줄바꿈 처리
     return (
       <span key={index} style={{ whiteSpace: 'pre-wrap' }}>
         {part}
@@ -67,6 +72,13 @@ function WriteContent() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
+  // 태그 자동완성 상태
+  const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  
   // 커서 위치 저장용
   const [cursorPosition, setCursorPosition] = useState(0);
   
@@ -88,6 +100,56 @@ function WriteContent() {
     return () => clearInterval(autoSave);
   }, [title, content, tags]);
 
+  // 태그 자동완성 검색
+  useEffect(() => {
+    const searchTags = async () => {
+      const query = tagInput.trim().replace('#', '');
+      if (query.length < 1) {
+        setTagSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/tags/free/search?q=${encodeURIComponent(query)}&limit=5`
+        );
+        const data = await res.json();
+        if (data.success && data.data) {
+          // 이미 추가된 태그는 제외
+          const filtered = data.data.filter(
+            (tag: TagSuggestion) => !tags.includes(tag.name)
+          );
+          setTagSuggestions(filtered);
+          setShowSuggestions(filtered.length > 0);
+          setSelectedSuggestionIndex(-1);
+        }
+      } catch (err) {
+        console.error('태그 검색 실패:', err);
+      }
+    };
+
+    const debounce = setTimeout(searchTags, 200);
+    return () => clearTimeout(debounce);
+  }, [tagInput, tags]);
+
+  // 외부 클릭 시 자동완성 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        tagInputRef.current &&
+        !tagInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const fetchPost = async (id: string) => {
     setIsLoading(true);
     try {
@@ -105,7 +167,6 @@ function WriteContent() {
     }
   };
 
-  // textarea에서 커서 위치가 바뀔 때마다 저장
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
     setCursorPosition(e.target.selectionStart);
@@ -121,13 +182,10 @@ function WriteContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 현재 커서 위치 저장 (파일 선택 전에 이미 저장되어 있음)
     const insertPosition = cursorPosition;
-
     setIsUploading(true);
 
     try {
-      // 이미지 압축
       const options = {
         maxSizeMB: 1,
         maxWidthOrHeight: 1920,
@@ -135,10 +193,7 @@ function WriteContent() {
       };
 
       const compressedFile = await imageCompression(file, options);
-      console.log('원본 크기:', (file.size / 1024 / 1024).toFixed(2), 'MB');
-      console.log('압축 후:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
 
-      // S3에 업로드
       const formData = new FormData();
       formData.append('image', compressedFile);
 
@@ -158,7 +213,6 @@ function WriteContent() {
       const data = await res.json();
       const imageUrl = data.data?.url || data.url;
 
-      // 저장된 커서 위치에 이미지 삽입
       const imageMarkdown = `\n![이미지](${imageUrl})\n`;
       const newContent = 
         content.substring(0, insertPosition) + 
@@ -167,11 +221,9 @@ function WriteContent() {
       
       setContent(newContent);
       
-      // 새 커서 위치 설정 (이미지 다음)
       const newCursorPosition = insertPosition + imageMarkdown.length;
       setCursorPosition(newCursorPosition);
       
-      // textarea에 포커스 주고 커서 위치 설정
       setTimeout(() => {
         if (contentRef.current) {
           contentRef.current.focus();
@@ -179,7 +231,6 @@ function WriteContent() {
         }
       }, 100);
 
-      // 대표 이미지가 없으면 첫 이미지를 대표로
       if (!previewImage) {
         setPreviewImage(imageUrl);
       }
@@ -189,19 +240,25 @@ function WriteContent() {
       alert('이미지 업로드에 실패했습니다.');
     } finally {
       setIsUploading(false);
-      // 파일 입력 초기화 (같은 파일 다시 선택 가능하도록)
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  const handleAddTag = () => {
-    const tag = tagInput.trim().replace('#', '');
+  const handleAddTag = (tagName?: string) => {
+    const tag = (tagName || tagInput).trim().replace('#', '');
     if (tag && !tags.includes(tag) && tags.length < 10) {
       setTags([...tags, tag]);
       setTagInput('');
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
     }
+  };
+
+  const handleSelectSuggestion = (suggestion: TagSuggestion) => {
+    handleAddTag(suggestion.name);
+    tagInputRef.current?.focus();
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -209,7 +266,27 @@ function WriteContent() {
   };
 
   const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (showSuggestions && tagSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < tagSuggestions.length - 1 ? prev + 1 : prev
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleSelectSuggestion(tagSuggestions[selectedSuggestionIndex]);
+        } else {
+          handleAddTag();
+        }
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+      }
+    } else if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       handleAddTag();
     }
@@ -291,9 +368,9 @@ function WriteContent() {
         }}>
           <button 
             onClick={handleBack} 
-            style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '4px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
           >
-            ×
+            <X size={24} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {lastSaved && (
@@ -355,7 +432,11 @@ function WriteContent() {
           <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }} />
           
           {/* 태그 입력 */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '16px', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Tag size={16} className="text-gray-400" />
+              <span style={{ fontSize: '13px', color: '#999' }}>태그 (최대 10개)</span>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
               {tags.map(tag => (
                 <span 
@@ -364,7 +445,7 @@ function WriteContent() {
                     display: 'inline-flex', 
                     alignItems: 'center', 
                     gap: '4px', 
-                    padding: '4px 12px', 
+                    padding: '6px 12px', 
                     background: '#e8f4ff', 
                     color: '#0f62fe', 
                     borderRadius: '20px', 
@@ -379,32 +460,87 @@ function WriteContent() {
                       border: 'none', 
                       color: '#0f62fe', 
                       cursor: 'pointer', 
-                      fontSize: '16px', 
                       padding: '0', 
-                      lineHeight: 1 
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
                     }}
                   >
-                    ×
+                    <X size={14} />
                   </button>
                 </span>
               ))}
             </div>
-            <input 
-              type="text" 
-              value={tagInput} 
-              onChange={(e) => setTagInput(e.target.value)} 
-              onKeyDown={handleTagKeyDown} 
-              onBlur={handleAddTag} 
-              placeholder="태그 입력 (Enter로 추가)" 
-              style={{ 
-                padding: '8px 0', 
-                border: 'none', 
-                fontSize: '14px', 
-                outline: 'none', 
-                color: '#666', 
-                width: '200px' 
-              }} 
-            />
+            
+            {/* 태그 입력 + 자동완성 */}
+            <div style={{ position: 'relative' }}>
+              <input 
+                ref={tagInputRef}
+                type="text" 
+                value={tagInput} 
+                onChange={(e) => setTagInput(e.target.value)} 
+                onKeyDown={handleTagKeyDown} 
+                onFocus={() => tagInput.trim() && tagSuggestions.length > 0 && setShowSuggestions(true)}
+                placeholder="태그 입력 (Enter로 추가)" 
+                style={{ 
+                  padding: '10px 12px', 
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  fontSize: '14px', 
+                  outline: 'none', 
+                  width: '100%',
+                  maxWidth: '300px',
+                }} 
+              />
+              
+              {/* 자동완성 드롭다운 */}
+              {showSuggestions && tagSuggestions.length > 0 && (
+                <div 
+                  ref={suggestionsRef}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    width: '100%',
+                    maxWidth: '300px',
+                    background: '#fff',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    marginTop: '4px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {tagSuggestions.map((suggestion, index) => (
+                    <button
+                      key={suggestion.id}
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: 'none',
+                        background: selectedSuggestionIndex === index ? '#f5f5f5' : '#fff',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        borderBottom: index < tagSuggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                      }}
+                      onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                    >
+                      <span style={{ fontSize: '14px', color: '#333' }}>
+                        #{suggestion.name}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>
+                        {suggestion.useCount}회 사용
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           
           {/* 내용 입력 */}
@@ -454,27 +590,42 @@ function WriteContent() {
             style={{ 
               background: 'none', 
               border: 'none', 
-              fontSize: '20px', 
               cursor: isUploading ? 'not-allowed' : 'pointer', 
               padding: '8px',
               opacity: isUploading ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }} 
             title="이미지 추가 (현재 커서 위치에 삽입)"
           >
-            {isUploading ? '⏳' : '🖼️'}
+            {isUploading ? (
+              <div style={{ 
+                width: '24px', 
+                height: '24px', 
+                border: '2px solid #ddd',
+                borderTopColor: '#0f62fe',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
+            ) : (
+              <Image size={24} className="text-gray-600" />
+            )}
           </button>
           <button 
             onClick={() => setShowPreview(!showPreview)} 
             style={{ 
               background: 'none', 
               border: 'none', 
-              fontSize: '20px', 
               cursor: 'pointer', 
-              padding: '8px' 
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }} 
             title="미리보기"
           >
-            👁️
+            <Eye size={24} className="text-gray-600" />
           </button>
           {isUploading && (
             <span style={{ fontSize: '14px', color: '#666' }}>
@@ -511,9 +662,9 @@ function WriteContent() {
                 <span style={{ fontWeight: '600' }}>미리보기</span>
                 <button 
                   onClick={() => setShowPreview(false)} 
-                  style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
                 >
-                  ×
+                  <X size={24} />
                 </button>
               </div>
               <div style={{ padding: '24px' }}>
@@ -533,14 +684,13 @@ function WriteContent() {
                 <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '16px' }}>
                   {title || '제목 없음'}
                 </h1>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
                   {tags.map(tag => (
                     <span key={tag} style={{ color: '#0f62fe', fontSize: '14px' }}>
                       #{tag}
                     </span>
                   ))}
                 </div>
-                {/* 마크다운 이미지 렌더링 */}
                 <div style={{ fontSize: '16px', lineHeight: 1.8 }}>
                   {renderMarkdownImages(content) || '내용 없음'}
                 </div>
@@ -548,6 +698,14 @@ function WriteContent() {
             </div>
           </div>
         )}
+
+        {/* 스피너 애니메이션 */}
+        <style jsx>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     </AuthGuard>
   );
