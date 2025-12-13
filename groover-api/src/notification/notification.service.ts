@@ -191,7 +191,7 @@ export class NotificationService {
   async notifyPostLike(userId: string, likerName: string, postId: string, postTitle: string) {
     return this.create({
       userId,
-      type: NotificationType.POST_LIKE,
+      type: NotificationType.POST_LIKED,
       title: '게시글 좋아요',
       message: `${likerName}님이 "${postTitle}" 게시글을 좋아합니다.`,
       targetType: 'post',
@@ -202,7 +202,7 @@ export class NotificationService {
   async notifyNewComment(userId: string, commenterName: string, postId: string, postTitle: string) {
     return this.create({
       userId,
-      type: NotificationType.NEW_COMMENT,
+      type: NotificationType.POST_COMMENTED,
       title: '새 댓글',
       message: `${commenterName}님이 "${postTitle}"에 댓글을 남겼습니다.`,
       targetType: 'post',
@@ -210,14 +210,14 @@ export class NotificationService {
     });
   }
 
-  async notifyCommentReply(userId: string, replierName: string, postId: string) {
+  async notifyDiscussionReply(userId: string, replierName: string, discussionId: string) {
     return this.create({
       userId,
-      type: NotificationType.COMMENT_REPLY,
-      title: '답글 알림',
-      message: `${replierName}님이 회원님의 댓글에 답글을 남겼습니다.`,
-      targetType: 'post',
-      targetId: postId,
+      type: NotificationType.DISCUSSION_REPLY,
+      title: '토론 답글',
+      message: `${replierName}님이 토론에 답글을 남겼습니다.`,
+      targetType: 'discussion',
+      targetId: discussionId,
     });
   }
 
@@ -232,12 +232,32 @@ export class NotificationService {
     });
   }
 
+  async notifyTagNewPost(userId: string, tagName: string, postId: string, postTitle: string) {
+    return this.create({
+      userId,
+      type: NotificationType.TAG_NEW_POST,
+      title: '관심 태그 새 글',
+      message: `#${tagName} 태그에 새 글이 올라왔습니다: "${postTitle}"`,
+      targetType: 'post',
+      targetId: postId,
+    });
+  }
+
   async notifyWarning(userId: string, reason: string) {
     return this.create({
       userId,
       type: NotificationType.WARNING_RECEIVED,
       title: '경고 알림',
       message: `경고를 받았습니다: ${reason}`,
+    });
+  }
+
+  async notifySystem(userId: string, title: string, message: string) {
+    return this.create({
+      userId,
+      type: NotificationType.SYSTEM_NOTICE,
+      title,
+      message,
     });
   }
 }

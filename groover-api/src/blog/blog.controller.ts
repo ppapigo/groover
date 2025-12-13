@@ -13,17 +13,13 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
-  UploadedFiles,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
 import { BlogService } from './blog.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
-import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('blog')
 export class BlogController {
@@ -152,36 +148,19 @@ export class BlogController {
   }
 
   /**
- * 추천 피드 (개인화 알고리즘)
- * GET /v1/blog/feed/recommended
- */
-@Get('feed/recommended')
-@UseGuards(OptionalJwtAuthGuard)
-async getRecommendedFeed(@Request() req, @Query() query: FeedQueryDto) {
-  const result = await this.blogService.getRecommendedFeed(query, req.user?.id);
-  return {
-    success: true,
-    data: result,
-  };
-}
+   * 추천 피드 (개인화 알고리즘)
+   * GET /v1/blog/feed/recommended
+   */
+  @Get('feed/recommended')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getRecommendedFeed(@Request() req, @Query() query: FeedQueryDto) {
+    const result = await this.blogService.getRecommendedFeed(query, req.user?.id);
+    return {
+      success: true,
+      data: result,
+    };
+  }
 
-/**
- * 최신 글 피드 (특정 글 이후)
- * GET /v1/blog/feed/new
- */
-@Get('feed/new')
-@UseGuards(OptionalJwtAuthGuard)
-async getNewFeed(
-  @Request() req,
-  @Query('after') after?: string,
-  @Query('limit') limit: number = 20,
-) {
-  const result = await this.blogService.getNewFeed(after || null, limit, req.user?.id);
-  return {
-    success: true,
-    data: result,
-  };
-}
   // ========================================
   // 글 상세
   // ========================================
@@ -190,28 +169,24 @@ async getNewFeed(
    * 글 상세 조회
    * GET /v1/blog/posts/:slug
    */
-  /**
- * 글 상세 조회
- * GET /v1/blog/posts/:slug
- */
-@Get('posts/:slug')
-@UseGuards(OptionalJwtAuthGuard)
-async getPost(
-  @Request() req,
-  @Param('slug') slug: string,
-) {
-  const post = await this.blogService.getPostBySlug(slug, req.user?.id);
-  
-  // 로그인 유저면 열람 기록 저장
-  if (req.user?.id) {
-    this.blogService.recordPostView(post.id, req.user.id);
+  @Get('posts/:slug')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getPost(
+    @Request() req,
+    @Param('slug') slug: string,
+  ) {
+    const post = await this.blogService.getPostBySlug(slug, req.user?.id);
+    
+    // 로그인 유저면 열람 기록 저장
+    if (req.user?.id) {
+      this.blogService.recordPostView(post.id, req.user.id);
+    }
+    
+    return {
+      success: true,
+      data: post,
+    };
   }
-  
-  return {
-    success: true,
-    data: post,
-  };
-}
 
   /**
    * 연관 글 조회
@@ -228,23 +203,6 @@ async getPost(
     return {
       success: true,
       data: posts,
-    };
-  }
-
-  // ========================================
-  // 상품 정보 (Lazy Load)
-  // ========================================
-
-  /**
-   * 글의 상품 카드 정보 조회 (클라이언트에서 Lazy Load)
-   * GET /v1/blog/posts/:id/products
-   */
-  @Get('posts/:id/products')
-  async getPostProducts(@Param('id', ParseUUIDPipe) id: string) {
-    const products = await this.blogService.getPostProducts(id);
-    return {
-      success: true,
-      data: products,
     };
   }
 

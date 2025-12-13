@@ -2,28 +2,28 @@
 
 import { IsString, IsOptional, IsEnum } from 'class-validator';
 
-// 알림 타입
+// 알림 타입 - Prisma enum과 일치
 export enum NotificationType {
   NEW_FOLLOWER = 'NEW_FOLLOWER',
-  POST_LIKE = 'POST_LIKE',
-  NEW_COMMENT = 'NEW_COMMENT',
-  COMMENT_REPLY = 'COMMENT_REPLY',
+  POST_LIKED = 'POST_LIKED',
+  POST_COMMENTED = 'POST_COMMENTED',
+  DISCUSSION_REPLY = 'DISCUSSION_REPLY',
   NEW_MESSAGE = 'NEW_MESSAGE',
+  TAG_NEW_POST = 'TAG_NEW_POST',
   SYSTEM_NOTICE = 'SYSTEM_NOTICE',
   WARNING_RECEIVED = 'WARNING_RECEIVED',
-  SUSPENSION_NOTICE = 'SUSPENSION_NOTICE',
 }
 
 // 푸시 우선순위
 export const PUSH_PRIORITY: Record<NotificationType, boolean> = {
   [NotificationType.NEW_FOLLOWER]: false,
-  [NotificationType.POST_LIKE]: false,
-  [NotificationType.NEW_COMMENT]: true,
-  [NotificationType.COMMENT_REPLY]: true,
-  [NotificationType.NEW_MESSAGE]: false,
+  [NotificationType.POST_LIKED]: false,
+  [NotificationType.POST_COMMENTED]: true,
+  [NotificationType.DISCUSSION_REPLY]: true,
+  [NotificationType.NEW_MESSAGE]: true,
+  [NotificationType.TAG_NEW_POST]: false,
   [NotificationType.SYSTEM_NOTICE]: false,
   [NotificationType.WARNING_RECEIVED]: true,
-  [NotificationType.SUSPENSION_NOTICE]: true,
 };
 
 // ========================================
