@@ -840,14 +840,14 @@ function BlogContent() {
                   </div>
                 </div>
                 
-                {/* 하단: 메타 정보 */}
+                {/* 하단: 메타 정보 - 우측 정렬 */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'flex-end',
                   gap: '6px',
                   fontSize: '13px',
                   color: '#999',
-                  paddingLeft: thumbnail ? '92px' : '0',
                 }}>
                   <span style={{ color: '#666' }}>{post.author?.name}</span>
                   <span>·</span>
@@ -871,16 +871,18 @@ function BlogContent() {
                   )}
                   
                   {post.likeCount > 0 && (
-                    <span style={{ 
-                      marginLeft: 'auto',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '3px',
-                      color: '#ff6f0f',
-                      fontWeight: '500',
-                    }}>
-                      <Heart size={14} fill="#ff6f0f" /> {post.likeCount}
-                    </span>
+                    <>
+                      <span>·</span>
+                      <span style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '3px',
+                        color: '#ff6f0f',
+                        fontWeight: '500',
+                      }}>
+                        <Heart size={14} fill="#ff6f0f" /> {post.likeCount}
+                      </span>
+                    </>
                   )}
                 </div>
               </article>
