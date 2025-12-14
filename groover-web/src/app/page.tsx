@@ -223,6 +223,7 @@ export default function HomePage() {
         .post-card {
           flex: 0 0 160px;
           min-width: 160px;
+          max-width: 160px;
           background: white;
           border-radius: 12px;
           overflow: hidden;
@@ -253,6 +254,8 @@ export default function HomePage() {
         }
         .post-info {
           padding: 10px;
+          width: 100%;
+          box-sizing: border-box;
         }
         .post-info h3 {
           font-size: 13px;
@@ -261,6 +264,7 @@ export default function HomePage() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          max-width: 140px;
         }
         .post-meta {
           font-size: 11px;
