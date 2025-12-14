@@ -13,7 +13,7 @@ const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션'
 
 export default function HomePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { posts, isLoading, fetchPosts } = useFeed({});
 
   useEffect(() => {
@@ -23,8 +23,11 @@ export default function HomePage() {
   // 글쓰기 버튼 클릭 핸들러
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    
+    // 인증 로딩 중이면 기다리기
+    if (authLoading) return;
+    
     if (!user) {
-      // 로그인 안 되어있으면 로그인 페이지로
       if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/write');
       }
@@ -40,7 +43,7 @@ export default function HomePage() {
         <section className="hero-section">
           <h1>쇼핑 리뷰 커뮤니티</h1>
           <p>솔직한 리뷰와 추천을 공유하세요</p>
-          <button onClick={handleWriteClick} className="cta-btn">
+          <button onClick={handleWriteClick} className="cta-btn" disabled={authLoading}>
             <PenLine size={18} />
             글 쓰기
           </button>
@@ -70,30 +73,34 @@ export default function HomePage() {
               <div className="loading-spinner"></div>
             </div>
           ) : (
-            <div className="post-grid">
-              {(posts || []).slice(0, 6).map((post) => (
-                <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
-                  <div className="post-thumb-wrapper">
-                    {post.previewImage ? (
-                      <img className="post-thumb" src={post.previewImage} alt={post.title} />
-                    ) : (
-                      <div className="post-thumb-placeholder">📝</div>
-                    )}
-                  </div>
-                  <div className="post-info">
-                    <h3>{post.title}</h3>
-                    <div className="post-meta">
-                      <span>{post.author?.name}</span>
-                      <span className="meta-item">
-                        <Eye size={12} /> {post.viewCount}
-                      </span>
-                      <span className="meta-item">
-                        <Heart size={12} /> {post.likeCount}
-                      </span>
+            <div className="post-scroll-container">
+              <div className="post-scroll">
+                {(posts || []).slice(0, 10).map((post) => (
+                  <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
+                    <div className="post-thumb-wrapper">
+                      {post.previewImage ? (
+                        <img className="post-thumb" src={post.previewImage} alt={post.title} />
+                      ) : (
+                        <div className="post-thumb-placeholder">📝</div>
+                      )}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                    <div className="post-info">
+                      <h3>{post.title}</h3>
+                      <div className="post-meta">
+                        <span className="author-name">{post.author?.name}</span>
+                        <div className="meta-stats">
+                          <span className="meta-item">
+                            <Eye size={12} /> {post.viewCount}
+                          </span>
+                          <span className="meta-item">
+                            <Heart size={12} /> {post.likeCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
 
@@ -111,6 +118,8 @@ export default function HomePage() {
       <style jsx>{`
         .home-page {
           padding-bottom: 80px;
+          max-width: 100vw;
+          overflow-x: hidden;
         }
         .hero-section {
           text-align: center;
@@ -146,6 +155,10 @@ export default function HomePage() {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
+        .cta-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
         .tags-section {
           padding: 20px;
         }
@@ -173,12 +186,14 @@ export default function HomePage() {
         }
         .feed-section {
           padding: 20px;
+          padding-right: 0;
         }
         .section-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 16px;
+          padding-right: 20px;
         }
         .section-header h2 {
           font-size: 16px;
@@ -188,22 +203,38 @@ export default function HomePage() {
           color: #667eea;
           text-decoration: none;
         }
-        .post-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
+        .post-scroll-container {
+          width: 100%;
+          overflow: hidden;
+        }
+        .post-scroll {
+          display: flex;
           gap: 12px;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: 8px;
+          padding-right: 20px;
+          scrollbar-width: none;
+        }
+        .post-scroll::-webkit-scrollbar {
+          display: none;
         }
         .post-card {
+          flex: 0 0 160px;
+          min-width: 160px;
+          max-width: 160px;
           background: white;
           border-radius: 12px;
           overflow: hidden;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           text-decoration: none;
           color: inherit;
+          scroll-snap-align: start;
         }
         .post-thumb-wrapper {
           width: 100%;
-          aspect-ratio: 4/3;
+          aspect-ratio: 1/1;
           overflow: hidden;
         }
         .post-thumb {
@@ -222,20 +253,33 @@ export default function HomePage() {
           color: #999;
         }
         .post-info {
-          padding: 12px;
+          padding: 10px;
+          width: 100%;
+          box-sizing: border-box;
         }
         .post-info h3 {
-          font-size: 14px;
-          margin-bottom: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          margin-bottom: 6px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 140px;
+        }
+        .post-meta {
+          font-size: 11px;
+          color: #888;
+        }
+        .author-name {
+          display: block;
+          margin-bottom: 4px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .post-meta {
+        .meta-stats {
           display: flex;
           gap: 8px;
-          font-size: 11px;
-          color: #888;
         }
         .meta-item {
           display: flex;
