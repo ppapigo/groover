@@ -218,21 +218,21 @@ export default function HomePage() {
           scrollbar-width: none;
         }
         .post-scroll {
-            display: flex;
-            gap: 16px;
-            overflow-x: auto;
-            overflow-y: visible;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 60px;
-            padding-right: 20px;
-            scrollbar-width: none;
-          }
-        .post-card {
-          flex: 0 0 160px;
-          min-width: 160px;
-          max-width: 160px;
-          width: 160px;
+          display: flex;
+          gap: 24px;
+          overflow-x: auto;
+          overflow-y: visible;
+          scroll-snap-type: x mandatory;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: 60px;
+          padding-right: 20px;
+          scrollbar-width: none;
+        }
+       .post-card {
+          flex: 0 0 180px;
+          min-width: 180px;
+          max-width: 180px;
+          width: 180px;
           background: white;
           border-radius: 12px;
           overflow: visible;
