@@ -1,5 +1,6 @@
 {
   "name": "groover-api",
+  "@aws-sdk/client-ses": "^3.600.0",
   "version": "1.0.0",
   "description": "Groover Backend API Server",
   "scripts": {
