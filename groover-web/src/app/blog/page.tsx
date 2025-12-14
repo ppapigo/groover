@@ -22,20 +22,52 @@ interface FeedTag {
 function extractThumbnail(content: string, previewImage?: string): string | null {
   if (previewImage) return previewImage;
   
+  if (!content) return null;
+  
   const regex = /!\[.*?\]\((.*?)\)/;
-  const match = regex.exec(content || '');
+  const match = regex.exec(content);
   return match ? match[1] : null;
 }
 
-// 본문 텍스트 추출 함수 (마크다운 제거)
+// 본문 텍스트 추출 함수 (마크다운 제거) - 개선됨
 function extractPreviewText(content: string): string {
-  return content
-    ?.replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[#*`_~>]/g, '')
-    .replace(/\n+/g, ' ')
-    .trim()
-    .slice(0, 150) || '';
+  if (!content) return '';
+  
+  let text = content;
+  
+  // 1. 마크다운 이미지 제거 (![alt](url) 형식)
+  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+  
+  // 2. 마크다운 링크를 텍스트만 남기기 ([text](url) -> text)
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  
+  // 3. 마크다운 헤더 기호 제거 (# ## ### 등)
+  text = text.replace(/^#{1,6}\s+/gm, '');
+  
+  // 4. 굵게, 기울임, 취소선 등 제거
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  text = text.replace(/\*([^*]+)\*/g, '$1');     // *italic*
+  text = text.replace(/__([^_]+)__/g, '$1');     // __bold__
+  text = text.replace(/_([^_]+)_/g, '$1');       // _italic_
+  text = text.replace(/~~([^~]+)~~/g, '$1');     // ~~strikethrough~~
+  text = text.replace(/`([^`]+)`/g, '$1');       // `code`
+  
+  // 5. 인용구, 리스트 기호 제거
+  text = text.replace(/^>\s*/gm, '');
+  text = text.replace(/^[-*+]\s+/gm, '');
+  text = text.replace(/^\d+\.\s+/gm, '');
+  
+  // 6. 여러 줄바꿈을 공백으로
+  text = text.replace(/\n+/g, ' ');
+  
+  // 7. 여러 공백을 하나로
+  text = text.replace(/\s+/g, ' ');
+  
+  // 8. 앞뒤 공백 제거
+  text = text.trim();
+  
+  // 9. 최대 150자로 제한
+  return text.slice(0, 150);
 }
 
 function BlogContent() {
@@ -371,7 +403,7 @@ function BlogContent() {
           )}
         </div>
 
-        {/* 헤더 - + 버튼 삭제 */}
+        {/* 헤더 */}
         <div className="blog-header">
           <h2>오늘의 쇼핑 리뷰</h2>
         </div>

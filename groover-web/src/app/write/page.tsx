@@ -317,19 +317,32 @@ function WriteContent() {
   const handlePublish = async () => {
     if (!title.trim()) { alert('제목을 입력해주세요.'); return; }
     if (!content.trim()) { alert('내용을 입력해주세요.'); return; }
+    
     setIsLoading(true);
     try {
       const data = { title, content, tags, previewImage, publish: true };
+      
       if (editId) {
+        // 수정 모드
         await api.put(`/blog/posts/${editId}`, data);
         await api.post(`/blog/posts/${editId}/publish`, { publish: true });
       } else {
-        await api.post('/blog/posts', data);
+        // 새 글 작성 모드 - 먼저 저장 후 발행
+        const res = await api.post('/blog/posts', data);
+        const newPostId = res.data.data?.id || res.data.data?.slug;
+        
+        // 새 글도 publish 엔드포인트 호출
+        if (newPostId) {
+          await api.post(`/blog/posts/${newPostId}/publish`, { publish: true });
+        }
       }
+      
       alert('글이 발행되었습니다!');
       router.push('/blog');
-    } catch (err) {
-      alert('발행에 실패했습니다.');
+    } catch (err: any) {
+      console.error('발행 실패:', err);
+      const errorMessage = err.response?.data?.message || '발행에 실패했습니다.';
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
