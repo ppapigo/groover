@@ -32,7 +32,7 @@ export class BlogService {
         content: dto.content,
         previewImage,
         tags: dto.tags || [],
-        metadata: dto.metadata || null, // 메타데이터 저장
+        metadata: dto.metadata as any || null,
         slug,
         excerpt,
         status: dto.publish ? 'PUBLISHED' : 'DRAFT',
@@ -48,40 +48,39 @@ export class BlogService {
   }
 
   async updatePost(postId: string, userId: string, dto: UpdatePostDto) {
-    const existingPost = await this.prisma.post.findUnique({
-      where: { id: postId },
-    });
+  const existingPost = await this.prisma.post.findUnique({
+    where: { id: postId },
+  });
 
-    if (!existingPost) {
-      throw new NotFoundException('글을 찾을 수 없습니다.');
-    }
-
-    if (existingPost.userId !== userId) {
-      throw new ForbiddenException('본인의 글만 수정할 수 있습니다.');
-    }
-
-    let updateData: any = { ...dto };
-
-    if (dto.title && dto.title !== existingPost.title) {
-      updateData.slug = await this.generateSlug(dto.title, postId);
-    }
-
-    // metadata가 있으면 업데이트
-    if (dto.metadata !== undefined) {
-      updateData.metadata = dto.metadata;
-    }
-
-    const post = await this.prisma.post.update({
-      where: { id: postId },
-      data: updateData,
-      include: {
-        user: { select: { id: true, name: true } },
-      },
-    });
-
-    return this.formatPost(post);
+  if (!existingPost) {
+    throw new NotFoundException('글을 찾을 수 없습니다.');
   }
 
+  if (existingPost.userId !== userId) {
+    throw new ForbiddenException('본인의 글만 수정할 수 있습니다.');
+  }
+
+  let updateData: any = { ...dto };
+
+  if (dto.title && dto.title !== existingPost.title) {
+    updateData.slug = await this.generateSlug(dto.title, postId);
+  }
+
+  // metadata 타입 호환성 처리
+  if (dto.metadata !== undefined) {
+    updateData.metadata = dto.metadata as any;
+  }
+
+  const post = await this.prisma.post.update({
+    where: { id: postId },
+    data: updateData,
+    include: {
+      user: { select: { id: true, name: true } },
+    },
+  });
+
+  return this.formatPost(post);
+}
   async deletePost(postId: string, userId: string) {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
