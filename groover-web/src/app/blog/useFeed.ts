@@ -8,13 +8,24 @@ interface Author {
   profileImage?: string;
 }
 
+interface PostMetadata {
+  purchaseStatus?: string;
+  priceRange?: string;
+  storeName?: string;
+  summary?: string;
+}
+
 interface Post {
   id: string;
   title: string;
   content: string;
   thumbnail?: string;
+  previewImage?: string;
+  slug: string;
+  excerpt?: string;
   category: string;
   tags: string[];
+  metadata?: PostMetadata;
   author: Author;
   viewCount: number;
   likeCount: number;
@@ -24,7 +35,7 @@ interface Post {
 }
 
 interface FeedResponse {
-  posts: Post[];
+  items: Post[];
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -68,14 +79,13 @@ export function useFeed(options: UseFeedOptions = {}) {
         throw new Error('피드를 불러오는데 실패했습니다.');
       }
 
-      const data: FeedResponse = await response.json();
+      const result = await response.json();
+      const data: FeedResponse = result.data || result;
 
       if (cursor) {
-        // 더 불러오기
-        setPosts(prev => [...prev, ...data.posts]);
+        setPosts(prev => [...prev, ...data.items]);
       } else {
-        // 새로 불러오기
-        setPosts(data.posts);
+        setPosts(data.items);
       }
       
       setNextCursor(data.nextCursor);
