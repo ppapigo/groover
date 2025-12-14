@@ -217,9 +217,9 @@ export default function HomePage() {
           padding-right: 20px;
           scrollbar-width: none;
         }
-        .post-scroll {
+       .post-scroll {
           display: flex;
-          gap: 24px;
+          gap: 40px;
           overflow-x: auto;
           overflow-y: visible;
           scroll-snap-type: x mandatory;
