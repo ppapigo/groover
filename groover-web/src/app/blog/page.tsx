@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { Plus, Eye, Heart, Tag, X, Pin, PinOff, GripVertical, Settings, MessageCircle } from 'lucide-react';
+import { Plus, Eye, Heart, Tag, X, Pin, PinOff, GripVertical, Settings, MessageCircle, MoreVertical, Pencil, Trash2, Flag } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FeedTag {
@@ -50,6 +50,7 @@ function BlogContent() {
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [showTagManager, setShowTagManager] = useState(false);
   const [draggedTag, setDraggedTag] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -107,6 +108,17 @@ function BlogContent() {
   useEffect(() => {
     fetchPosts(null);
   }, [activeTag]);
+
+  // 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuId) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
 
   const handleTagSelect = (tag: string | null) => {
     if (tag) {
@@ -180,6 +192,67 @@ function BlogContent() {
       }
     } else {
       router.push('/write');
+    }
+  };
+
+  // 메뉴 토글
+  const handleMenuToggle = (e: React.MouseEvent, postSlug: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === postSlug ? null : postSlug);
+  };
+
+  // 수정
+  const handleEdit = (e: React.MouseEvent, postSlug: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(null);
+    router.push(`/write?edit=${postSlug}`);
+  };
+
+  // 삭제
+  const handleDelete = async (e: React.MouseEvent, postSlug: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(null);
+    
+    if (!confirm('정말 이 글을 삭제하시겠습니까?')) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/posts/${postSlug}`,
+        { 
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      if (res.ok) {
+        fetchPosts(null);
+      } else {
+        alert('삭제에 실패했습니다.');
+      }
+    } catch (err) {
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 신고
+  const handleReport = (e: React.MouseEvent, postSlug: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(null);
+    
+    if (!user) {
+      if (confirm('신고하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
+        router.push('/login?redirect=/blog');
+      }
+      return;
+    }
+    
+    if (confirm('이 글을 신고하시겠습니까?')) {
+      // TODO: 신고 API 호출
+      alert('신고가 접수되었습니다.');
     }
   };
 
@@ -298,14 +371,9 @@ function BlogContent() {
           )}
         </div>
 
-        {/* 헤더 */}
+        {/* 헤더 - + 버튼 삭제 */}
         <div className="blog-header">
           <h2>오늘의 쇼핑 리뷰</h2>
-          <div className="blog-actions">
-            <button onClick={handleWriteClick} className="write-btn">
-              <Plus size={20} />
-            </button>
-          </div>
         </div>
 
         {/* 태그 관리 패널 */}
@@ -558,67 +626,33 @@ function BlogContent() {
           </div>
         )}
 
-        {/* 포스트 리스트 - 글 정보 아래로 */}
+        {/* 포스트 리스트 */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {(posts || []).map((post, index) => {
             const thumbnail = extractThumbnail(post.content, post.previewImage);
             const previewText = extractPreviewText(post.content);
+            const isAuthor = user && post.author?.id === user.id;
             
             return (
-              <Link 
-                key={post.slug} 
-                href={`/blog/${post.slug}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+              <article 
+                key={post.slug}
+                style={{
+                  padding: '16px 0',
+                  borderBottom: '1px solid #f0f0f0',
+                }}
               >
-                <article 
-                  style={{
-                    padding: '16px 0',
-                    borderBottom: '1px solid #f0f0f0',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {/* 상단: 제목 + 썸네일 */}
-                  <div style={{ 
-                    display: 'flex',
-                    gap: '16px',
-                    marginBottom: '12px',
-                  }}>
-                    {/* 좌측: 제목 + 본문 미리보기 */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        lineHeight: 1.4,
-                        marginBottom: '6px',
-                        color: '#212121',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {post.title}
-                      </h3>
-                      
-                      {previewText && (
-                        <p style={{
-                          fontSize: '14px',
-                          color: '#666',
-                          lineHeight: 1.5,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}>
-                          {previewText}
-                        </p>
-                      )}
-                    </div>
-                    
-                    {/* 우측: 썸네일 */}
-                    {thumbnail && (
+                {/* 상단: 썸네일 + 제목 + 메뉴 */}
+                <div style={{ 
+                  display: 'flex',
+                  gap: '12px',
+                  marginBottom: '12px',
+                }}>
+                  {/* 썸네일 (왼쪽) */}
+                  {thumbnail && (
+                    <Link href={`/blog/${post.slug}`} style={{ flexShrink: 0 }}>
                       <div style={{
-                        flexShrink: 0,
-                        width: '88px',
-                        height: '88px',
+                        width: '80px',
+                        height: '80px',
                         borderRadius: '8px',
                         overflow: 'hidden',
                         background: '#f5f5f5',
@@ -633,53 +667,191 @@ function BlogContent() {
                           }}
                         />
                       </div>
+                    </Link>
+                  )}
+                  
+                  {/* 중앙: 제목 + 본문 미리보기 */}
+                  <Link 
+                    href={`/blog/${post.slug}`}
+                    style={{ 
+                      flex: 1, 
+                      minWidth: 0,
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      lineHeight: 1.4,
+                      marginBottom: '6px',
+                      color: '#212121',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {post.title}
+                    </h3>
+                    
+                    {previewText && (
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        lineHeight: 1.5,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {previewText}
+                      </p>
+                    )}
+                  </Link>
+                  
+                  {/* 우측: 더보기 메뉴 */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => handleMenuToggle(e, post.slug)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                      }}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    
+                    {/* 드롭다운 메뉴 */}
+                    {openMenuId === post.slug && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          background: '#fff',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                          overflow: 'hidden',
+                          zIndex: 100,
+                          minWidth: '120px',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isAuthor && (
+                          <>
+                            <button
+                              onClick={(e) => handleEdit(e, post.slug)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '12px 16px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                color: '#333',
+                                textAlign: 'left',
+                              }}
+                            >
+                              <Pencil size={16} />
+                              수정
+                            </button>
+                            <button
+                              onClick={(e) => handleDelete(e, post.slug)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '12px 16px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                color: '#ff4444',
+                                textAlign: 'left',
+                              }}
+                            >
+                              <Trash2 size={16} />
+                              삭제
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={(e) => handleReport(e, post.slug)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            width: '100%',
+                            padding: '12px 16px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            color: '#666',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <Flag size={16} />
+                          신고
+                        </button>
+                      </div>
                     )}
                   </div>
+                </div>
+                
+                {/* 하단: 메타 정보 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  color: '#999',
+                  paddingLeft: thumbnail ? '92px' : '0',
+                }}>
+                  <span style={{ color: '#666' }}>{post.author?.name}</span>
+                  <span>·</span>
+                  <span>{formatTime(post.publishedAt)}</span>
+                  <span>·</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <Eye size={14} /> {post.viewCount}
+                  </span>
                   
-                  {/* 하단: 메타 정보 */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '13px',
-                    color: '#999',
-                  }}>
-                    <span style={{ color: '#666' }}>{post.author?.name}</span>
-                    <span>·</span>
-                    <span>{formatTime(post.publishedAt)}</span>
-                    <span>·</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <Eye size={14} /> {post.viewCount}
-                    </span>
-                    
-                    {post.commentCount > 0 && (
-                      <>
-                        <span>·</span>
-                        <span style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '2px',
-                        }}>
-                          <MessageCircle size={14} /> {post.commentCount}
-                        </span>
-                      </>
-                    )}
-                    
-                    {post.likeCount > 0 && (
+                  {post.commentCount > 0 && (
+                    <>
+                      <span>·</span>
                       <span style={{ 
-                        marginLeft: 'auto',
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '3px',
-                        color: '#ff6f0f',
-                        fontWeight: '500',
+                        gap: '2px',
                       }}>
-                        <Heart size={14} fill="#ff6f0f" /> {post.likeCount}
+                        <MessageCircle size={14} /> {post.commentCount}
                       </span>
-                    )}
-                  </div>
-                </article>
-              </Link>
+                    </>
+                  )}
+                  
+                  {post.likeCount > 0 && (
+                    <span style={{ 
+                      marginLeft: 'auto',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '3px',
+                      color: '#ff6f0f',
+                      fontWeight: '500',
+                    }}>
+                      <Heart size={14} fill="#ff6f0f" /> {post.likeCount}
+                    </span>
+                  )}
+                </div>
+              </article>
             );
           })}
 
