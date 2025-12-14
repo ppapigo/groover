@@ -9,6 +9,13 @@ interface Author {
   profileImage?: string;
 }
 
+interface PostMetadata {
+  purchaseStatus?: string;
+  priceRange?: string;
+  storeName?: string;
+  summary?: string;
+}
+
 interface Post {
   id: string;
   title: string;
@@ -17,6 +24,7 @@ interface Post {
   previewImage?: string; 
   category: string;
   tags: string[];
+  metadata?: PostMetadata;
   author: Author;
   viewCount: number;
   likeCount: number;
@@ -58,7 +66,6 @@ export function useFeed(options: UseFeedOptions = {}) {
       params.append('limit', limit.toString());
       if (cursor) params.append('cursor', cursor);
 
-      // 피드 타입에 따라 엔드포인트 결정
       let endpoint = '/blog/feed';
       
       if (category && category !== '전체') {
