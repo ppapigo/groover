@@ -20,13 +20,11 @@ export default function HomePage() {
     fetchPosts(null);
   }, []);
 
-  // 글쓰기 버튼 클릭 핸들러
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    // 인증 로딩 중이면 기다리기
+
     if (authLoading) return;
-    
+
     if (!user) {
       if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/write');
@@ -76,26 +74,37 @@ export default function HomePage() {
             <div className="post-scroll-container">
               <div className="post-scroll">
                 {(posts || []).slice(0, 10).map((post) => (
-                  <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
+                  <Link
+                    key={post.slug}
+                    href={`/blog/${post.slug}`}
+                    className="home-post-card" // ✅ 글로벌 .post-card 충돌 방지
+                  >
                     {post.previewImage ? (
-                      <div className="post-thumb-wrapper">
-                        <img className="post-thumb" src={post.previewImage} alt={post.title} />
+                      <div className="home-post-thumb-wrapper">
+                        <img className="home-post-thumb" src={post.previewImage} alt={post.title} />
                       </div>
                     ) : null}
-                    <div className="post-info">
-                      <h3>{post.title}</h3>
+
+                    <div className="home-post-info">
+                      <h3 className="home-post-title">{post.title}</h3>
+
                       {!post.previewImage && (
-                        <p className="post-preview">
-                          {post.content?.replace(/!\[.*?\]\(.*?\)/g, '').replace(/[#*`]/g, '').slice(0, 50)}...
+                        <p className="home-post-preview">
+                          {post.content
+                            ?.replace(/!\[.*?\]\(.*?\)/g, '')
+                            .replace(/[#*`]/g, '')
+                            .slice(0, 50)}
+                          ...
                         </p>
                       )}
-                      <div className="post-meta">
-                        <span className="author-name">{post.author?.name}</span>
-                        <div className="meta-stats">
-                          <span className="meta-item">
+
+                      <div className="home-post-meta">
+                        <span className="home-author-name">{post.author?.name}</span>
+                        <div className="home-meta-stats">
+                          <span className="home-meta-item">
                             <Eye size={12} /> {post.viewCount}
                           </span>
-                          <span className="meta-item">
+                          <span className="home-meta-item">
                             <Heart size={12} /> {post.likeCount}
                           </span>
                         </div>
@@ -124,6 +133,7 @@ export default function HomePage() {
           max-width: 100vw;
           overflow-x: hidden;
         }
+
         .hero-section {
           text-align: center;
           padding: 40px 20px;
@@ -148,7 +158,6 @@ export default function HomePage() {
           color: #667eea;
           border-radius: 25px;
           font-weight: 600;
-          text-decoration: none;
           border: none;
           cursor: pointer;
           font-size: 15px;
@@ -156,12 +165,13 @@ export default function HomePage() {
         }
         .cta-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
         .cta-btn:disabled {
           opacity: 0.7;
           cursor: not-allowed;
         }
+
         .tags-section {
           padding: 20px;
         }
@@ -187,6 +197,7 @@ export default function HomePage() {
           background: #667eea;
           color: white;
         }
+
         .feed-section {
           padding: 20px;
           padding-right: 0;
@@ -206,6 +217,7 @@ export default function HomePage() {
           color: #667eea;
           text-decoration: none;
         }
+
         .post-scroll-container {
           width: 100%;
           overflow: hidden;
@@ -223,71 +235,90 @@ export default function HomePage() {
         .post-scroll::-webkit-scrollbar {
           display: none;
         }
-        .post-card {
+
+        /* ✅ 홈 전용 카드 (글로벌 .post-card와 완전 분리) */
+        .home-post-card {
           flex: 0 0 160px;
           min-width: 160px;
           max-width: 160px;
           background: white;
           border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
           text-decoration: none;
           color: inherit;
           scroll-snap-align: start;
+          display: flex;
+          flex-direction: column;
         }
-        .post-thumb-wrapper {
+
+        .home-post-thumb-wrapper {
           width: 100%;
           height: 120px;
           overflow: hidden;
         }
-        .post-thumb {
+        .home-post-thumb {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          display: block;
         }
-        .post-info {
+
+        .home-post-info {
           padding: 10px;
           width: 100%;
           box-sizing: border-box;
+          min-width: 0; /* ✅ 텍스트가 카드 밖으로 밀고 나가지 않게 */
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
-        .post-info h3 {
+
+        .home-post-title {
           font-size: 13px;
           font-weight: 600;
-          margin-bottom: 6px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          max-width: 100%;
+          margin: 0;
         }
-        .post-preview {
+
+        .home-post-preview {
           font-size: 12px;
           color: #666;
-          margin-bottom: 8px;
           overflow: hidden;
           display: -webkit-box;
           -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           line-height: 1.4;
+          margin: 0;
         }
-        .post-meta {
+
+        .home-post-meta {
           font-size: 11px;
           color: #888;
+          margin-top: auto;
         }
-        .author-name {
+        .home-author-name {
           display: block;
           margin-bottom: 4px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          max-width: 100%;
         }
-        .meta-stats {
+        .home-meta-stats {
           display: flex;
           gap: 8px;
         }
-        .meta-item {
+        .home-meta-item {
           display: flex;
           align-items: center;
           gap: 2px;
         }
+
         .loading {
           display: flex;
           justify-content: center;
@@ -302,8 +333,11 @@ export default function HomePage() {
           animation: spin 1s linear infinite;
         }
         @keyframes spin {
-          to { transform: rotate(360deg); }
+          to {
+            transform: rotate(360deg);
+          }
         }
+
         .empty-state {
           text-align: center;
           padding: 40px 20px;
@@ -316,7 +350,6 @@ export default function HomePage() {
           background: #667eea;
           color: white;
           border-radius: 20px;
-          text-decoration: none;
           border: none;
           cursor: pointer;
           font-size: 14px;
