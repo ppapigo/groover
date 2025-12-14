@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { Plus, Eye, Heart, Tag, X, Pin, PinOff, GripVertical, Settings } from 'lucide-react';
+import { Plus, Eye, Heart, Tag, X, Pin, PinOff, GripVertical, Settings, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FeedTag {
@@ -18,123 +18,24 @@ interface FeedTag {
   iconEmoji?: string;
 }
 
-// 이미지 슬라이더 컴포넌트
-function ImageSlider({ content, previewImage }: { content: string; previewImage?: string }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const startX = useRef(0);
+// 썸네일 이미지 추출 함수
+function extractThumbnail(content: string, previewImage?: string): string | null {
+  if (previewImage) return previewImage;
+  
+  const regex = /!\[.*?\]\((.*?)\)/;
+  const match = regex.exec(content || '');
+  return match ? match[1] : null;
+}
 
-  // 본문에서 이미지 URL 추출
-  const extractImages = (text: string): string[] => {
-    const images: string[] = [];
-    if (previewImage) images.push(previewImage);
-    
-    const regex = /!\[.*?\]\((.*?)\)/g;
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      if (!images.includes(match[1])) {
-        images.push(match[1]);
-      }
-    }
-    return images.slice(0, 5); // 최대 5개
-  };
-
-  const images = extractImages(content || '');
-
-  if (images.length === 0) {
-    return (
-      <div style={{
-        width: '100%',
-        aspectRatio: '4/3',
-        background: '#f5f5f5',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '32px',
-        borderRadius: '12px',
-      }}>
-        📝
-      </div>
-    );
-  }
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const endX = e.changedTouches[0].clientX;
-    const diff = startX.current - endX;
-    
-    if (Math.abs(diff) > 50) {
-      if (diff > 0 && currentIndex < images.length - 1) {
-        setCurrentIndex(currentIndex + 1);
-      } else if (diff < 0 && currentIndex > 0) {
-        setCurrentIndex(currentIndex - 1);
-      }
-    }
-  };
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          width: '100%',
-          aspectRatio: '4/3',
-          overflow: 'hidden',
-          borderRadius: '12px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            transition: 'transform 0.3s ease',
-            transform: `translateX(-${currentIndex * 100}%)`,
-            height: '100%',
-          }}
-        >
-          {images.map((img, idx) => (
-            <img
-              key={idx}
-              src={img}
-              alt={`이미지 ${idx + 1}`}
-              style={{
-                minWidth: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      
-      {/* 인디케이터 */}
-      {images.length > 1 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '8px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: '6px',
-        }}>
-          {images.map((_, idx) => (
-            <div
-              key={idx}
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: currentIndex === idx ? '#fff' : 'rgba(255,255,255,0.5)',
-                transition: 'background 0.2s',
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// 본문 텍스트 추출 함수 (마크다운 제거)
+function extractPreviewText(content: string): string {
+  return content
+    ?.replace(/!\[.*?\]\(.*?\)/g, '') // 이미지 제거
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 링크 텍스트만 남기기
+    .replace(/[#*`_~>]/g, '') // 마크다운 기호 제거
+    .replace(/\n+/g, ' ') // 줄바꿈을 공백으로
+    .trim()
+    .slice(0, 150) || '';
 }
 
 function BlogContent() {
@@ -172,7 +73,6 @@ function BlogContent() {
   useEffect(() => {
     const fetchTags = async () => {
       try {
-        // 인기 태그
         const popularRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/tags/feed/popular?limit=20`
         );
@@ -181,7 +81,6 @@ function BlogContent() {
           setPopularTags(popularData.data);
         }
 
-        // 로그인한 경우 핀한 태그도 불러오기
         if (user) {
           const token = localStorage.getItem('accessToken');
           const pinnedRes = await fetch(
@@ -203,17 +102,14 @@ function BlogContent() {
     fetchTags();
   }, [user]);
 
-  // URL의 tag 파라미터 변경 감지
   useEffect(() => {
     setActiveTag(tagFromUrl);
   }, [tagFromUrl]);
 
-  // 태그 변경 시 글 다시 불러오기
   useEffect(() => {
     fetchPosts(null);
   }, [activeTag]);
 
-  // 태그 선택 핸들러
   const handleTagSelect = (tag: string | null) => {
     if (tag) {
       router.push(`/blog?tag=${encodeURIComponent(tag)}`);
@@ -222,7 +118,6 @@ function BlogContent() {
     }
   };
 
-  // 태그 핀/언핀
   const handlePinTag = async (tag: FeedTag) => {
     if (!user) {
       if (confirm('태그를 핀하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
@@ -253,7 +148,6 @@ function BlogContent() {
     }
   };
 
-  // 태그 순서 변경
   const handleReorderTags = async (fromIndex: number, toIndex: number) => {
     const newPinnedTags = [...pinnedTags];
     const [movedTag] = newPinnedTags.splice(fromIndex, 1);
@@ -280,7 +174,6 @@ function BlogContent() {
     }
   };
 
-  // 글쓰기 버튼 클릭 핸들러
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
@@ -292,7 +185,6 @@ function BlogContent() {
     }
   };
 
-  // Pull to refresh 핸들러
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (containerRef.current?.scrollTop === 0 && !showTagManager) {
       startY.current = e.touches[0].clientY;
@@ -332,8 +224,23 @@ function BlogContent() {
     setIsPulling(false);
   }, [isPulling, pullDistance, isRefreshing, fetchPosts]);
 
-  // 표시할 태그 (핀한 태그 우선, 없으면 인기 태그)
   const displayTags = pinnedTags.length > 0 ? pinnedTags : popularTags.slice(0, 10);
+
+  // 시간 포맷팅 함수
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    if (hours < 24) return `${hours}시간 전`;
+    if (days < 7) return `${days}일 전`;
+    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  };
 
   return (
     <>
@@ -429,7 +336,6 @@ function BlogContent() {
               </button>
             </div>
             
-            {/* 핀한 태그 */}
             {pinnedTags.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
@@ -482,7 +388,6 @@ function BlogContent() {
               </div>
             )}
             
-            {/* 인기 태그에서 핀하기 */}
             <div>
               <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
                 인기 태그 (탭해서 핀하기)
@@ -656,100 +561,132 @@ function BlogContent() {
           </div>
         )}
 
-        {/* 포스트 리스트 - 새로운 레이아웃 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {(posts || []).map((post) => (
-            <div 
-              key={post.slug} 
-              style={{
-                background: '#fff',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-              }}
-            >
-              {/* 상단: 작성자 정보 */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '14px 16px',
-              }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: '#f0f0f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                }}>
-                  {post.author?.name?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <p style={{ fontWeight: '600', fontSize: '14px' }}>{post.author?.name}</p>
-                  <p style={{ fontSize: '12px', color: '#888' }}>
-                    {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
-                  </p>
-                </div>
-              </div>
-
-              {/* 제목 */}
-              <Link href={`/blog/${post.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <h3 style={{
-                  padding: '0 16px',
-                  fontSize: '17px',
-                  fontWeight: '700',
-                  lineHeight: 1.4,
-                  marginBottom: '8px',
-                }}>
-                  {post.title}
-                </h3>
+        {/* 포스트 리스트 - 당근마켓 스타일 */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {(posts || []).map((post, index) => {
+            const thumbnail = extractThumbnail(post.content, post.previewImage);
+            const previewText = extractPreviewText(post.content);
+            
+            return (
+              <Link 
+                key={post.slug} 
+                href={`/blog/${post.slug}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                <article 
+                  style={{
+                    display: 'flex',
+                    gap: '16px',
+                    padding: '16px 0',
+                    borderBottom: '1px solid #f0f0f0',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {/* 좌측: 콘텐츠 영역 */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* 제목 */}
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      lineHeight: 1.4,
+                      marginBottom: '6px',
+                      color: '#212121',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {post.title}
+                    </h3>
+                    
+                    {/* 본문 미리보기 */}
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#666',
+                      lineHeight: 1.5,
+                      marginBottom: '10px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}>
+                      {previewText}
+                    </p>
+                    
+                    {/* 메타 정보 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13px',
+                      color: '#999',
+                    }}>
+                      <span style={{ color: '#666' }}>{post.author?.name}</span>
+                      <span>·</span>
+                      <span>{formatTime(post.publishedAt)}</span>
+                      <span>·</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <Eye size={14} /> {post.viewCount}
+                      </span>
+                      
+                      {/* 우측 정렬: 좋아요, 댓글 */}
+                      <div style={{ 
+                        marginLeft: 'auto', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '10px',
+                      }}>
+                        {post.commentCount > 0 && (
+                          <span style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '3px',
+                            color: '#666',
+                          }}>
+                            <MessageCircle size={14} />
+                            {post.commentCount}
+                          </span>
+                        )}
+                        {post.likeCount > 0 && (
+                          <span style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '3px',
+                            color: '#ff6f0f',
+                            fontWeight: '500',
+                          }}>
+                            <Heart size={14} fill="#ff6f0f" />
+                            {post.likeCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 우측: 썸네일 */}
+                  {thumbnail && (
+                    <div style={{
+                      flexShrink: 0,
+                      width: '88px',
+                      height: '88px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      background: '#f5f5f5',
+                    }}>
+                      <img 
+                        src={thumbnail}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </div>
+                  )}
+                </article>
               </Link>
-
-              {/* 본문 미리보기 */}
-              <Link href={`/blog/${post.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <p style={{
-                  padding: '0 16px',
-                  fontSize: '14px',
-                  color: '#666',
-                  lineHeight: 1.6,
-                  marginBottom: '12px',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}>
-                  {post.content?.replace(/!\[.*?\]\(.*?\)/g, '').replace(/[#*`]/g, '').slice(0, 100)}
-                </p>
-              </Link>
-
-              {/* 이미지 슬라이더 */}
-              <div style={{ padding: '0 16px' }}>
-                <Link href={`/blog/${post.slug}`} style={{ display: 'block' }}>
-                  <ImageSlider content={post.content} previewImage={post.previewImage} />
-                </Link>
-              </div>
-
-              {/* 하단: 좋아요, 조회수 */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                padding: '14px 16px',
-                borderTop: '1px solid #f0f0f0',
-                marginTop: '12px',
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#666', fontSize: '14px' }}>
-                  <Heart size={18} /> {post.likeCount}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#666', fontSize: '14px' }}>
-                  <Eye size={18} /> {post.viewCount}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* 로딩 */}
           {isLoading && (
@@ -780,9 +717,41 @@ function BlogContent() {
 
           <div ref={targetRef} style={{ height: '20px' }} />
         </div>
+
+        {/* 플로팅 글쓰기 버튼 */}
+        <button
+          onClick={handleWriteClick}
+          style={{
+            position: 'fixed',
+            bottom: '80px',
+            right: '20px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: '#0f62fe',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(15, 98, 254, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            zIndex: 100,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(15, 98, 254, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 98, 254, 0.4)';
+          }}
+        >
+          <Plus size={28} color="#fff" />
+        </button>
       </div>
 
-      {/* 스피너 애니메이션 CSS */}
+      {/* 애니메이션 CSS */}
       <style jsx>{`
         @keyframes spin {
           from { transform: rotate(0deg); }

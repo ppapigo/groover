@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, Heart, PenLine } from 'lucide-react';
+import { Eye, Heart, PenLine, TrendingUp } from 'lucide-react';
 
 const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
 
@@ -20,11 +20,9 @@ export default function HomePage() {
     fetchPosts(null);
   }, []);
 
-  // 글쓰기 버튼 클릭 핸들러
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     
-    // 인증 로딩 중이면 기다리기
     if (authLoading) return;
     
     if (!user) {
@@ -34,6 +32,27 @@ export default function HomePage() {
     } else {
       router.push('/write');
     }
+  };
+
+  // 인기글 정렬 (좋아요 + 조회수 기준)
+  const popularPosts = [...(posts || [])]
+    .sort((a, b) => (b.likeCount * 3 + b.viewCount) - (a.likeCount * 3 + a.viewCount))
+    .slice(0, 5);
+
+  // 시간 포맷팅
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    if (hours < 24) return `${hours}시간 전`;
+    if (days < 7) return `${days}일 전`;
+    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -62,7 +81,10 @@ export default function HomePage() {
 
         <section className="feed-section">
           <div className="section-header">
-            <h2>최신 리뷰</h2>
+            <h2>
+              <TrendingUp size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+              인기글
+            </h2>
             <Link href="/blog" className="more-link">
               더 보기
             </Link>
@@ -73,37 +95,29 @@ export default function HomePage() {
               <div className="loading-spinner"></div>
             </div>
           ) : (
-            <div className="post-scroll-container">
-              <div className="post-scroll">
-                {(posts || []).slice(0, 10).map((post) => (
-                  <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
-                    {post.previewImage ? (
-                      <div className="post-thumb-wrapper">
-                        <img className="post-thumb" src={post.previewImage} alt={post.title} />
-                      </div>
-                    ) : null}
-                    <div className="post-info">
-                      <h3>{post.title}</h3>
-                      {!post.previewImage && (
-                        <p className="post-preview">
-                          {post.content?.replace(/!\[.*?\]\(.*?\)/g, '').replace(/[#*`]/g, '').slice(0, 50)}...
-                        </p>
+            <div className="popular-list">
+              {popularPosts.map((post, index) => (
+                <Link key={post.slug} href={`/blog/${post.slug}`} className="popular-item">
+                  <span className="rank">{index + 1}</span>
+                  <div className="popular-content">
+                    <h3 className="popular-title">{post.title}</h3>
+                    <div className="popular-meta">
+                      <span className="author">{post.author?.name}</span>
+                      <span className="dot">·</span>
+                      <span className="time">{formatTime(post.publishedAt)}</span>
+                      <span className="dot">·</span>
+                      <span className="stat">
+                        <Eye size={12} /> {post.viewCount}
+                      </span>
+                      {post.likeCount > 0 && (
+                        <span className="stat like">
+                          <Heart size={12} fill="#ff6f0f" /> {post.likeCount}
+                        </span>
                       )}
-                      <div className="post-meta">
-                        <span className="author-name">{post.author?.name}</span>
-                        <div className="meta-stats">
-                          <span className="meta-item">
-                            <Eye size={12} /> {post.viewCount}
-                          </span>
-                          <span className="meta-item">
-                            <Heart size={12} /> {post.likeCount}
-                          </span>
-                        </div>
-                      </div>
                     </div>
-                  </Link>
-                ))}
-              </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
 
@@ -189,105 +203,93 @@ export default function HomePage() {
         }
         .feed-section {
           padding: 20px;
-          padding-right: 0;
         }
         .section-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 16px;
-          padding-right: 20px;
         }
         .section-header h2 {
           font-size: 16px;
+          display: flex;
+          align-items: center;
         }
         .more-link {
           font-size: 13px;
           color: #667eea;
           text-decoration: none;
         }
-        .post-scroll-container {
-          width: 100%;
-          overflow: hidden;
-        }
-        .post-scroll {
+        
+        /* 인기글 리스트 스타일 */
+        .popular-list {
           display: flex;
+          flex-direction: column;
+        }
+        .popular-item {
+          display: flex;
+          align-items: flex-start;
           gap: 12px;
-          overflow-x: auto;
-          scroll-snap-type: x mandatory;
-          -webkit-overflow-scrolling: touch;
-          padding-bottom: 8px;
-          padding-right: 20px;
-          scrollbar-width: none;
-        }
-        .post-scroll::-webkit-scrollbar {
-          display: none;
-        }
-        .post-card {
-          flex: 0 0 160px;
-          min-width: 160px;
-          max-width: 160px;
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          padding: 14px 0;
+          border-bottom: 1px solid #f0f0f0;
           text-decoration: none;
           color: inherit;
-          scroll-snap-align: start;
+          transition: background 0.15s;
         }
-        .post-thumb-wrapper {
-          width: 100%;
-          height: 120px;
-          overflow: hidden;
+        .popular-item:last-child {
+          border-bottom: none;
         }
-        .post-thumb {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
+        .popular-item:active {
+          background: #f9f9f9;
         }
-        .post-info {
-          padding: 10px;
-          width: 100%;
-          box-sizing: border-box;
+        .rank {
+          flex-shrink: 0;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 700;
+          color: #667eea;
         }
-        .post-info h3 {
-          font-size: 13px;
+        .popular-content {
+          flex: 1;
+          min-width: 0;
+        }
+        .popular-title {
+          font-size: 15px;
           font-weight: 600;
+          color: #212121;
           margin-bottom: 6px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .post-preview {
-          font-size: 12px;
-          color: #666;
-          margin-bottom: 8px;
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-          line-height: 1.4;
-        }
-        .post-meta {
-          font-size: 11px;
-          color: #888;
-        }
-        .author-name {
-          display: block;
-          margin-bottom: 4px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .meta-stats {
+        .popular-meta {
           display: flex;
-          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 4px;
+          font-size: 12px;
+          color: #999;
         }
-        .meta-item {
+        .author {
+          color: #666;
+        }
+        .dot {
+          color: #ddd;
+        }
+        .stat {
           display: flex;
           align-items: center;
           gap: 2px;
         }
+        .stat.like {
+          color: #ff6f0f;
+          font-weight: 500;
+        }
+        
         .loading {
           display: flex;
           justify-content: center;
