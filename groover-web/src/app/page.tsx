@@ -217,9 +217,17 @@ export default function HomePage() {
           padding-right: 20px;
           scrollbar-width: none;
         }
-        .post-scroll::-webkit-scrollbar {
-          display: none;
-        }
+        .post-scroll {
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            overflow-y: visible;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 60px;
+            padding-right: 20px;
+            scrollbar-width: none;
+          }
         .post-card {
           flex: 0 0 160px;
           min-width: 160px;
@@ -227,11 +235,12 @@ export default function HomePage() {
           width: 160px;
           background: white;
           border-radius: 12px;
-          overflow: hidden;
+          overflow: visible;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           text-decoration: none;
           color: inherit;
           scroll-snap-align: start;
+          position: relative;
         }
         .post-thumb-wrapper {
           width: 100%;
