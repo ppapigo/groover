@@ -7,17 +7,28 @@ export interface User {
   profileImageUrl?: string;
 }
 
+export interface PostMetadata {
+  purchaseStatus?: string;
+  priceRange?: string;
+  storeName?: string;
+  summary?: string;
+}
+
 export interface Post {
   id: string;
   title: string;
   desc: string;
   content?: string;
+  slug?: string;
+  excerpt?: string;
+  previewImage?: string;
   date: string;
   author: string;
   tags: string[];
   imageUrl: string;
   likes: number;
   views: number;
+  metadata?: PostMetadata;
 }
 
 export interface Message {
