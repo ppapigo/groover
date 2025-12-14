@@ -1,50 +1,52 @@
 // src/app/login/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/';
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [loginId, setLoginId] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
-  setIsLoading(true);
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
 
-  try {
-    // 이메일인지 아이디인지 판단
-    const isEmail = loginId.includes('@');
-    const loginData = isEmail 
-      ? { email: loginId, password } 
-      : { userId: loginId, password };
-    
-    await login(loginData);
-    router.push('/');
-  } catch (err: any) {
-    const errorCode = err.response?.data?.code;
-    if (errorCode === 'EMAIL_NOT_VERIFIED') {
-      const email = err.response?.data?.email;
-      router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
-    } else {
-      setError(err.response?.data?.message || '로그인에 실패했습니다.');
+    try {
+      const isEmail = loginId.includes('@');
+      const loginData = isEmail 
+        ? { email: loginId, password } 
+        : { userId: loginId, password };
+      
+      await login(loginData);
+      router.push(redirect);
+    } catch (err: any) {
+      const errorCode = err.response?.data?.code;
+      if (errorCode === 'EMAIL_NOT_VERIFIED') {
+        const email = err.response?.data?.email;
+        router.push(`/auth/verify-pending?email=${encodeURIComponent(email)}`);
+      } else {
+        setError(err.response?.data?.message || '로그인에 실패했습니다.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleGoogleLogin = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1';
-    window.location.href = `${apiUrl}/auth/google`;
+    // redirect 파라미터를 state로 전달
+    const state = encodeURIComponent(redirect);
+    window.location.href = `${apiUrl}/auth/google?state=${state}`;
   };
 
   return (
@@ -151,17 +153,17 @@ export default function LoginPage() {
         {/* 로그인 버튼 */}
         <button
           type="submit"
-         disabled={isLoading || !loginId || !password}
+          disabled={isLoading || !loginId || !password}
           style={{
             width: '100%',
             padding: '16px',
-            background: email && password ? '#0f62fe' : '#ccc',
+            background: loginId && password ? '#0f62fe' : '#ccc',
             color: '#fff',
             border: 'none',
             borderRadius: '10px',
             fontSize: '16px',
             fontWeight: '600',
-            cursor: email && password ? 'pointer' : 'not-allowed',
+            cursor: loginId && password ? 'pointer' : 'not-allowed',
           }}
         >
           {isLoading ? '로그인 중...' : '로그인'}
@@ -262,5 +264,13 @@ export default function LoginPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>로딩 중...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
