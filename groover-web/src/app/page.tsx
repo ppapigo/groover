@@ -77,15 +77,18 @@ export default function HomePage() {
               <div className="post-scroll">
                 {(posts || []).slice(0, 10).map((post) => (
                   <Link key={post.slug} href={`/blog/${post.slug}`} className="post-card">
-                    <div className="post-thumb-wrapper">
-                      {post.previewImage ? (
+                    {post.previewImage ? (
+                      <div className="post-thumb-wrapper">
                         <img className="post-thumb" src={post.previewImage} alt={post.title} />
-                      ) : (
-                        <div className="post-thumb-placeholder">📝</div>
-                      )}
-                    </div>
+                      </div>
+                    ) : null}
                     <div className="post-info">
                       <h3>{post.title}</h3>
+                      {!post.previewImage && (
+                        <p className="post-preview">
+                          {post.content?.replace(/!\[.*?\]\(.*?\)/g, '').replace(/[#*`]/g, '').slice(0, 50)}...
+                        </p>
+                      )}
                       <div className="post-meta">
                         <span className="author-name">{post.author?.name}</span>
                         <div className="meta-stats">
@@ -217,50 +220,30 @@ export default function HomePage() {
           padding-right: 20px;
           scrollbar-width: none;
         }
-       .post-scroll {
-          display: flex;
-          gap: 40px;
-          overflow-x: auto;
-          overflow-y: visible;
-          scroll-snap-type: x mandatory;
-          -webkit-overflow-scrolling: touch;
-          padding-bottom: 60px;
-          padding-right: 20px;
-          scrollbar-width: none;
+        .post-scroll::-webkit-scrollbar {
+          display: none;
         }
-       .post-card {
-          flex: 0 0 180px;
-          min-width: 180px;
-          max-width: 180px;
-          width: 180px;
+        .post-card {
+          flex: 0 0 160px;
+          min-width: 160px;
+          max-width: 160px;
           background: white;
           border-radius: 12px;
-          overflow: visible;
+          overflow: hidden;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           text-decoration: none;
           color: inherit;
           scroll-snap-align: start;
-          position: relative;
         }
         .post-thumb-wrapper {
           width: 100%;
-          aspect-ratio: 1/1;
+          height: 120px;
           overflow: hidden;
         }
         .post-thumb {
           width: 100%;
           height: 100%;
           object-fit: cover;
-        }
-        .post-thumb-placeholder {
-          width: 100%;
-          height: 100%;
-          background: #f5f5f5;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 24px;
-          color: #999;
         }
         .post-info {
           padding: 10px;
@@ -274,7 +257,16 @@ export default function HomePage() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          max-width: 140px;
+        }
+        .post-preview {
+          font-size: 12px;
+          color: #666;
+          margin-bottom: 8px;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          line-height: 1.4;
         }
         .post-meta {
           font-size: 11px;
