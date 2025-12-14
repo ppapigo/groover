@@ -4,10 +4,14 @@ import {
   IsArray,
   IsOptional,
   IsBoolean,
+  IsObject,
   MaxLength,
   MinLength,
   ArrayMaxSize,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PostMetadataDto } from './create-post.dto';
 
 export class UpdatePostDto {
   @IsOptional()
@@ -37,6 +41,12 @@ export class UpdatePostDto {
   @IsString()
   @MaxLength(300)
   excerpt?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PostMetadataDto)
+  metadata?: PostMetadataDto;
 
   @IsOptional()
   @IsBoolean()

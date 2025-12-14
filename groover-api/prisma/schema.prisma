@@ -41,7 +41,7 @@ model User {
   postLikes         PostLike[]
   postShares        PostShare[]
   comments          Comment[]
-postHistories UserPostHistory[]
+  postHistories     UserPostHistory[]
   
   // 태그 시스템
   pinnedTags        UserPinnedTag[]
@@ -172,6 +172,9 @@ model Post {
   content       String
   previewImage  String?
   
+  // 리뷰 메타데이터 (구매상태, 가격대, 구매처, 핵심요약)
+  metadata      Json?
+  
   // 기존 태그 (하위호환)
   tags          String[]
 
@@ -195,7 +198,7 @@ model Post {
   likes         PostLike[]
   shares        PostShare[]
   comments      Comment[]
-viewHistories UserPostHistory[]
+  viewHistories UserPostHistory[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -205,6 +208,7 @@ viewHistories UserPostHistory[]
   @@index([publishedAt])
   @@index([slug])
 }
+
 model UserPostHistory {
   id        String   @id @default(uuid())
   userId    String
@@ -218,6 +222,7 @@ model UserPostHistory {
   @@index([userId])
   @@index([postId])
 }
+
 // Post-FeedTag 연결 테이블
 model PostFeedTag {
   id        String   @id @default(uuid())

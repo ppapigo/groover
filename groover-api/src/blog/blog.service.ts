@@ -32,6 +32,7 @@ export class BlogService {
         content: dto.content,
         previewImage,
         tags: dto.tags || [],
+        metadata: dto.metadata || null, // 메타데이터 저장
         slug,
         excerpt,
         status: dto.publish ? 'PUBLISHED' : 'DRAFT',
@@ -63,6 +64,11 @@ export class BlogService {
 
     if (dto.title && dto.title !== existingPost.title) {
       updateData.slug = await this.generateSlug(dto.title, postId);
+    }
+
+    // metadata가 있으면 업데이트
+    if (dto.metadata !== undefined) {
+      updateData.metadata = dto.metadata;
     }
 
     const post = await this.prisma.post.update({
@@ -443,6 +449,7 @@ export class BlogService {
       content: post.content,
       previewImage: post.previewImage,
       tags: post.tags,
+      metadata: post.metadata, // 메타데이터 포함
       slug: post.slug,
       excerpt: post.excerpt,
       status: post.status,
@@ -464,6 +471,7 @@ export class BlogService {
       content: post.content,
       previewImage: post.previewImage,
       tags: post.tags,
+      metadata: post.metadata, // 메타데이터 포함
       slug: post.slug,
       status: post.status,
       viewCount: post.viewCount,
@@ -485,14 +493,17 @@ export class BlogService {
       excerpt: post.excerpt,
       slug: post.slug,
       tags: post.tags,
+      metadata: post.metadata, // 메타데이터 포함 (피드에서 구매상태, 요약 표시용)
       status: post.status,
       viewCount: post.viewCount,
       likeCount: post._count?.likes || post.likeCount,
+      commentCount: post.commentCount || 0,
       author: post.user,
       publishedAt: post.publishedAt,
     };
   }
-// ========================================
+
+  // ========================================
   // 추천 피드
   // ========================================
 
