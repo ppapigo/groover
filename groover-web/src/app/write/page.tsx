@@ -7,20 +7,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import api from '@/lib/api';
 import imageCompression from 'browser-image-compression';
-import { X, Image, Eye, Tag } from 'lucide-react';
-
-interface PostData {
-  title: string;
-  content: string;
-  tags: string[];
-  previewImage: string | null;
-}
+import { X, Image, Eye, Tag, ChevronDown, ShoppingBag, Store, DollarSign, MessageSquare } from 'lucide-react';
 
 interface TagSuggestion {
   id: string;
   name: string;
   useCount: number;
 }
+
+type PurchaseStatus = '구매함' | '고민중' | '비추천' | '';
 
 // 마크다운 이미지를 HTML로 변환하는 함수
 const renderMarkdownImages = (text: string) => {
@@ -72,6 +67,13 @@ function WriteContent() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
+  // 리뷰 필수 입력 필드
+  const [purchaseStatus, setPurchaseStatus] = useState<PurchaseStatus>('');
+  const [priceRange, setPriceRange] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  
   // 태그 자동완성 상태
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -116,7 +118,6 @@ function WriteContent() {
         );
         const data = await res.json();
         if (data.success && data.data) {
-          // 이미 추가된 태그는 제외
           const filtered = data.data.filter(
             (tag: TagSuggestion) => !tags.includes(tag.name)
           );
@@ -144,6 +145,7 @@ function WriteContent() {
       ) {
         setShowSuggestions(false);
       }
+      setShowStatusDropdown(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -159,6 +161,14 @@ function WriteContent() {
       setContent(post.content);
       setTags(post.tags || []);
       setPreviewImage(post.previewImage);
+      
+      // 메타데이터 파싱
+      if (post.metadata) {
+        setPurchaseStatus(post.metadata.purchaseStatus || '');
+        setPriceRange(post.metadata.priceRange || '');
+        setStoreName(post.metadata.storeName || '');
+        setSummary(post.metadata.summary || '');
+      }
     } catch (err) {
       alert('글을 불러오는데 실패했습니다.');
       router.back();
@@ -296,7 +306,13 @@ function WriteContent() {
     if (!title && !content) return;
     setIsSaving(true);
     try {
-      const data = { title: title || '제목 없음', content, tags, previewImage, publish: false };
+      const metadata = {
+        purchaseStatus,
+        priceRange,
+        storeName,
+        summary,
+      };
+      const data = { title: title || '제목 없음', content, tags, previewImage, metadata, publish: false };
       if (editId) {
         await api.put(`/blog/posts/${editId}`, data);
       } else {
@@ -315,23 +331,32 @@ function WriteContent() {
   };
 
   const handlePublish = async () => {
+    // 필수 입력 검증
     if (!title.trim()) { alert('제목을 입력해주세요.'); return; }
-    if (!content.trim()) { alert('내용을 입력해주세요.'); return; }
+    if (!purchaseStatus) { alert('구매 상태를 선택해주세요.'); return; }
+    if (!priceRange.trim()) { alert('가격대를 입력해주세요.'); return; }
+    if (!storeName.trim()) { alert('구매처를 입력해주세요.'); return; }
+    if (!summary.trim()) { alert('핵심 한 줄 요약을 입력해주세요.'); return; }
+    if (!previewImage) { alert('사진을 최소 1장 이상 등록해주세요.'); return; }
+    if (!content.trim()) { alert('상세 내용을 입력해주세요.'); return; }
     
     setIsLoading(true);
     try {
-      const data = { title, content, tags, previewImage, publish: true };
+      const metadata = {
+        purchaseStatus,
+        priceRange,
+        storeName,
+        summary,
+      };
+      const data = { title, content, tags, previewImage, metadata, publish: true };
       
       if (editId) {
-        // 수정 모드
         await api.put(`/blog/posts/${editId}`, data);
         await api.post(`/blog/posts/${editId}/publish`, { publish: true });
       } else {
-        // 새 글 작성 모드 - 먼저 저장 후 발행
         const res = await api.post('/blog/posts', data);
         const newPostId = res.data.data?.id || res.data.data?.slug;
         
-        // 새 글도 publish 엔드포인트 호출
         if (newPostId) {
           await api.post(`/blog/posts/${newPostId}/publish`, { publish: true });
         }
@@ -353,6 +378,15 @@ function WriteContent() {
       if (confirm('작성 중인 내용이 있습니다. 나가시겠습니까?')) router.back();
     } else {
       router.back();
+    }
+  };
+
+  const getStatusColor = (status: PurchaseStatus) => {
+    switch (status) {
+      case '구매함': return { bg: '#e8f5e9', color: '#2e7d32' };
+      case '고민중': return { bg: '#fff3e0', color: '#ef6c00' };
+      case '비추천': return { bg: '#ffebee', color: '#c62828' };
+      default: return { bg: '#f5f5f5', color: '#666' };
     }
   };
 
@@ -426,6 +460,7 @@ function WriteContent() {
 
         {/* 본문 */}
         <div style={{ flex: 1, padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          {/* 제목 */}
           <input 
             type="text" 
             value={title} 
@@ -442,12 +477,205 @@ function WriteContent() {
             }} 
           />
           
-          <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }} />
+          <div style={{ height: '1px', background: '#eee', marginBottom: '20px' }} />
+          
+          {/* 📌 리뷰 필수 정보 섹션 */}
+          <div style={{ 
+            background: '#f8f9fa', 
+            borderRadius: '12px', 
+            padding: '16px',
+            marginBottom: '20px',
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              marginBottom: '16px',
+              paddingBottom: '12px',
+              borderBottom: '1px solid #e9ecef',
+            }}>
+              <span style={{ fontSize: '18px' }}>📌</span>
+              <span style={{ fontSize: '15px', fontWeight: '600', color: '#333' }}>
+                리뷰 필수 정보
+              </span>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                (모두 입력해야 발행 가능)
+              </span>
+            </div>
+            
+            {/* 구매 상태 */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontSize: '13px', 
+                color: '#666',
+                marginBottom: '6px',
+              }}>
+                <ShoppingBag size={14} />
+                구매 상태 <span style={{ color: '#ff4444' }}>*</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowStatusDropdown(!showStatusDropdown);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    background: purchaseStatus ? getStatusColor(purchaseStatus).bg : '#fff',
+                    color: purchaseStatus ? getStatusColor(purchaseStatus).color : '#999',
+                    fontSize: '14px',
+                    fontWeight: purchaseStatus ? '600' : '400',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  {purchaseStatus || '선택하세요'}
+                  <ChevronDown size={18} style={{ color: '#999' }} />
+                </button>
+                
+                {showStatusDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: '#fff',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    marginTop: '4px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                  }}>
+                    {(['구매함', '고민중', '비추천'] as PurchaseStatus[]).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setPurchaseStatus(status);
+                          setShowStatusDropdown(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          border: 'none',
+                          background: purchaseStatus === status ? getStatusColor(status).bg : '#fff',
+                          color: getStatusColor(status).color,
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f0f0f0',
+                        }}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* 가격대 */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontSize: '13px', 
+                color: '#666',
+                marginBottom: '6px',
+              }}>
+                <DollarSign size={14} />
+                가격대 <span style={{ color: '#ff4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={priceRange}
+                onChange={(e) => setPriceRange(e.target.value)}
+                placeholder="예: 50,000원, 10만원대, 5~10만원"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+            
+            {/* 구매처 */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontSize: '13px', 
+                color: '#666',
+                marginBottom: '6px',
+              }}>
+                <Store size={14} />
+                구매처 <span style={{ color: '#ff4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="예: 쿠팡, 네이버쇼핑, 오프라인 매장"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+            
+            {/* 핵심 한 줄 요약 */}
+            <div>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontSize: '13px', 
+                color: '#666',
+                marginBottom: '6px',
+              }}>
+                <MessageSquare size={14} />
+                핵심 한 줄 요약 <span style={{ color: '#ff4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="예: 가성비 최고! / 디자인은 좋은데 내구성이 아쉬움"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+          </div>
           
           {/* 태그 입력 */}
           <div style={{ marginBottom: '16px', position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <Tag size={16} className="text-gray-400" />
+              <Tag size={16} style={{ color: '#999' }} />
               <span style={{ fontSize: '13px', color: '#999' }}>태그 (최대 10개)</span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
@@ -485,7 +713,6 @@ function WriteContent() {
               ))}
             </div>
             
-            {/* 태그 입력 + 자동완성 */}
             <div style={{ position: 'relative' }}>
               <input 
                 ref={tagInputRef}
@@ -506,7 +733,6 @@ function WriteContent() {
                 }} 
               />
               
-              {/* 자동완성 드롭다운 */}
               {showSuggestions && tagSuggestions.length > 0 && (
                 <div 
                   ref={suggestionsRef}
@@ -556,6 +782,22 @@ function WriteContent() {
             </div>
           </div>
           
+          {/* 사진 필수 안내 */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            marginBottom: '12px',
+            padding: '10px 12px',
+            background: previewImage ? '#e8f5e9' : '#fff3e0',
+            borderRadius: '8px',
+          }}>
+            <Image size={16} style={{ color: previewImage ? '#2e7d32' : '#ef6c00' }} />
+            <span style={{ fontSize: '13px', color: previewImage ? '#2e7d32' : '#ef6c00' }}>
+              {previewImage ? '✓ 사진이 등록되었습니다' : '사진을 최소 1장 이상 등록해주세요 *'}
+            </span>
+          </div>
+          
           {/* 내용 입력 */}
           <textarea 
             ref={contentRef} 
@@ -564,10 +806,10 @@ function WriteContent() {
             onSelect={handleContentSelect}
             onClick={handleContentSelect}
             onKeyUp={handleContentSelect}
-            placeholder="내용을 입력하세요...&#10;&#10;💡 팁: 원하는 위치에 커서를 두고 이미지 버튼을 클릭하면 해당 위치에 이미지가 삽입됩니다." 
+            placeholder="상세 내용을 입력하세요...&#10;&#10;💡 팁: 원하는 위치에 커서를 두고 이미지 버튼을 클릭하면 해당 위치에 이미지가 삽입됩니다." 
             style={{ 
               width: '100%', 
-              minHeight: '400px', 
+              minHeight: '300px', 
               padding: '0', 
               border: 'none', 
               fontSize: '16px', 
@@ -622,7 +864,7 @@ function WriteContent() {
                 animation: 'spin 1s linear infinite',
               }} />
             ) : (
-              <Image size={24} className="text-gray-600" />
+              <Image size={24} style={{ color: '#666' }} />
             )}
           </button>
           <button 
@@ -638,7 +880,7 @@ function WriteContent() {
             }} 
             title="미리보기"
           >
-            <Eye size={24} className="text-gray-600" />
+            <Eye size={24} style={{ color: '#666' }} />
           </button>
           {isUploading && (
             <span style={{ fontSize: '14px', color: '#666' }}>
@@ -681,6 +923,22 @@ function WriteContent() {
                 </button>
               </div>
               <div style={{ padding: '24px' }}>
+                {/* 구매 상태 배지 */}
+                {purchaseStatus && (
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '12px',
+                    background: getStatusColor(purchaseStatus).bg,
+                    color: getStatusColor(purchaseStatus).color,
+                  }}>
+                    {purchaseStatus}
+                  </span>
+                )}
+                
                 {previewImage && (
                   <img 
                     src={previewImage} 
@@ -694,9 +952,37 @@ function WriteContent() {
                     }} 
                   />
                 )}
-                <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '16px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px' }}>
                   {title || '제목 없음'}
                 </h1>
+                
+                {/* 핵심 한 줄 요약 */}
+                {summary && (
+                  <p style={{ 
+                    fontSize: '16px', 
+                    color: '#0f62fe', 
+                    fontWeight: '500',
+                    marginBottom: '16px',
+                    padding: '12px',
+                    background: '#e8f4ff',
+                    borderRadius: '8px',
+                  }}>
+                    💬 "{summary}"
+                  </p>
+                )}
+                
+                {/* 가격/구매처 정보 */}
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '16px', 
+                  marginBottom: '16px',
+                  fontSize: '14px',
+                  color: '#666',
+                }}>
+                  {priceRange && <span>💰 {priceRange}</span>}
+                  {storeName && <span>🏪 {storeName}</span>}
+                </div>
+                
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
                   {tags.map(tag => (
                     <span key={tag} style={{ color: '#0f62fe', fontSize: '14px' }}>

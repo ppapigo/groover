@@ -29,45 +29,14 @@ function extractThumbnail(content: string, previewImage?: string): string | null
   return match ? match[1] : null;
 }
 
-// 본문 텍스트 추출 함수 (마크다운 제거) - 개선됨
-function extractPreviewText(content: string): string {
-  if (!content) return '';
-  
-  let text = content;
-  
-  // 1. 마크다운 이미지 제거 (![alt](url) 형식)
-  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-  
-  // 2. 마크다운 링크를 텍스트만 남기기 ([text](url) -> text)
-  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  
-  // 3. 마크다운 헤더 기호 제거 (# ## ### 등)
-  text = text.replace(/^#{1,6}\s+/gm, '');
-  
-  // 4. 굵게, 기울임, 취소선 등 제거
-  text = text.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
-  text = text.replace(/\*([^*]+)\*/g, '$1');     // *italic*
-  text = text.replace(/__([^_]+)__/g, '$1');     // __bold__
-  text = text.replace(/_([^_]+)_/g, '$1');       // _italic_
-  text = text.replace(/~~([^~]+)~~/g, '$1');     // ~~strikethrough~~
-  text = text.replace(/`([^`]+)`/g, '$1');       // `code`
-  
-  // 5. 인용구, 리스트 기호 제거
-  text = text.replace(/^>\s*/gm, '');
-  text = text.replace(/^[-*+]\s+/gm, '');
-  text = text.replace(/^\d+\.\s+/gm, '');
-  
-  // 6. 여러 줄바꿈을 공백으로
-  text = text.replace(/\n+/g, ' ');
-  
-  // 7. 여러 공백을 하나로
-  text = text.replace(/\s+/g, ' ');
-  
-  // 8. 앞뒤 공백 제거
-  text = text.trim();
-  
-  // 9. 최대 150자로 제한
-  return text.slice(0, 150);
+// 구매 상태 색상
+function getStatusStyle(status: string) {
+  switch (status) {
+    case '구매함': return { bg: '#e8f5e9', color: '#2e7d32' };
+    case '고민중': return { bg: '#fff3e0', color: '#ef6c00' };
+    case '비추천': return { bg: '#ffebee', color: '#c62828' };
+    default: return { bg: '#f5f5f5', color: '#666' };
+  }
 }
 
 function BlogContent() {
@@ -141,7 +110,6 @@ function BlogContent() {
     fetchPosts(null);
   }, [activeTag]);
 
-  // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = () => {
       if (openMenuId) {
@@ -227,14 +195,12 @@ function BlogContent() {
     }
   };
 
-  // 메뉴 토글
   const handleMenuToggle = (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
     e.stopPropagation();
     setOpenMenuId(openMenuId === postSlug ? null : postSlug);
   };
 
-  // 수정
   const handleEdit = (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -242,7 +208,6 @@ function BlogContent() {
     router.push(`/write?edit=${postSlug}`);
   };
 
-  // 삭제
   const handleDelete = async (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -269,7 +234,6 @@ function BlogContent() {
     }
   };
 
-  // 신고
   const handleReport = (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -283,7 +247,6 @@ function BlogContent() {
     }
     
     if (confirm('이 글을 신고하시겠습니까?')) {
-      // TODO: 신고 API 호출
       alert('신고가 접수되었습니다.');
     }
   };
@@ -358,7 +321,7 @@ function BlogContent() {
           position: 'relative',
         }}
       >
-        {/* Pull to refresh 인디케이터 */}
+        {/* Pull to refresh */}
         <div 
           style={{
             height: `${pullDistance}px`,
@@ -651,7 +614,6 @@ function BlogContent() {
           </div>
         )}
 
-        {/* 에러 표시 */}
         {error && (
           <div className="error-message">
             {error}
@@ -660,10 +622,15 @@ function BlogContent() {
 
         {/* 포스트 리스트 */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {(posts || []).map((post, index) => {
+          {(posts || []).map((post) => {
             const thumbnail = extractThumbnail(post.content, post.previewImage);
-            const previewText = extractPreviewText(post.content);
             const isAuthor = user && post.author?.id === user.id;
+            
+            // 메타데이터에서 핵심 요약 가져오기
+            const metadata = post.metadata || {};
+            const summary = metadata.summary || '';
+            const purchaseStatus = metadata.purchaseStatus || '';
+            const priceRange = metadata.priceRange || '';
             
             return (
               <article 
@@ -677,9 +644,9 @@ function BlogContent() {
                 <div style={{ 
                   display: 'flex',
                   gap: '12px',
-                  marginBottom: '12px',
+                  marginBottom: '10px',
                 }}>
-                  {/* 썸네일 (왼쪽) */}
+                  {/* 썸네일 */}
                   {thumbnail && (
                     <Link href={`/blog/${post.slug}`} style={{ flexShrink: 0 }}>
                       <div style={{
@@ -688,6 +655,7 @@ function BlogContent() {
                         borderRadius: '8px',
                         overflow: 'hidden',
                         background: '#f5f5f5',
+                        position: 'relative',
                       }}>
                         <img 
                           src={thumbnail}
@@ -698,11 +666,27 @@ function BlogContent() {
                             objectFit: 'cover',
                           }}
                         />
+                        {/* 구매 상태 배지 */}
+                        {purchaseStatus && (
+                          <span style={{
+                            position: 'absolute',
+                            top: '4px',
+                            left: '4px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            background: getStatusStyle(purchaseStatus).bg,
+                            color: getStatusStyle(purchaseStatus).color,
+                          }}>
+                            {purchaseStatus}
+                          </span>
+                        )}
                       </div>
                     </Link>
                   )}
                   
-                  {/* 중앙: 제목 + 본문 미리보기 */}
+                  {/* 제목 + 요약 */}
                   <Link 
                     href={`/blog/${post.slug}`}
                     style={{ 
@@ -712,6 +696,22 @@ function BlogContent() {
                       color: 'inherit',
                     }}
                   >
+                    {/* 구매상태 (이미지 없을 때) */}
+                    {!thumbnail && purchaseStatus && (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        marginBottom: '6px',
+                        background: getStatusStyle(purchaseStatus).bg,
+                        color: getStatusStyle(purchaseStatus).color,
+                      }}>
+                        {purchaseStatus}
+                      </span>
+                    )}
+                    
                     <h3 style={{
                       fontSize: '16px',
                       fontWeight: '600',
@@ -725,22 +725,33 @@ function BlogContent() {
                       {post.title}
                     </h3>
                     
-                    {previewText && (
+                    {/* 핵심 한 줄 요약 (본문 미리보기 대신) */}
+                    {summary ? (
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#0f62fe',
+                        lineHeight: 1.5,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        💬 {summary}
+                      </p>
+                    ) : (
                       <p style={{
                         fontSize: '14px',
                         color: '#666',
                         lineHeight: 1.5,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}>
-                        {previewText}
+                        {priceRange && `💰 ${priceRange}`}
                       </p>
                     )}
                   </Link>
                   
-                  {/* 우측: 더보기 메뉴 */}
+                  {/* 더보기 메뉴 */}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <button
                       onClick={(e) => handleMenuToggle(e, post.slug)}
@@ -758,7 +769,6 @@ function BlogContent() {
                       <MoreVertical size={20} />
                     </button>
                     
-                    {/* 드롭다운 메뉴 */}
                     {openMenuId === post.slug && (
                       <div
                         style={{
@@ -889,21 +899,18 @@ function BlogContent() {
             );
           })}
 
-          {/* 로딩 */}
           {isLoading && (
             <div className="loading">
               <div className="loading-spinner"></div>
             </div>
           )}
 
-          {/* 더 이상 없음 */}
           {!hasMore && (posts || []).length > 0 && (
             <div className="end-message">
               모든 글을 불러왔습니다
             </div>
           )}
 
-          {/* 글 없음 */}
           {!isLoading && (posts || []).length === 0 && !error && (
             <div className="empty-state">
               <div className="empty-icon">📝</div>
