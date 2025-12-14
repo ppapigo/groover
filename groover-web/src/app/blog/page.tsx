@@ -30,10 +30,10 @@ function extractThumbnail(content: string, previewImage?: string): string | null
 // 본문 텍스트 추출 함수 (마크다운 제거)
 function extractPreviewText(content: string): string {
   return content
-    ?.replace(/!\[.*?\]\(.*?\)/g, '') // 이미지 제거
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 링크 텍스트만 남기기
-    .replace(/[#*`_~>]/g, '') // 마크다운 기호 제거
-    .replace(/\n+/g, ' ') // 줄바꿈을 공백으로
+    ?.replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*`_~>]/g, '')
+    .replace(/\n+/g, ' ')
     .trim()
     .slice(0, 150) || '';
 }
@@ -51,7 +51,6 @@ function BlogContent() {
   const [showTagManager, setShowTagManager] = useState(false);
   const [draggedTag, setDraggedTag] = useState<string | null>(null);
   
-  // Pull to refresh 상태
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -69,7 +68,6 @@ function BlogContent() {
     isLoading,
   });
 
-  // 인기 태그 & 핀한 태그 불러오기
   useEffect(() => {
     const fetchTags = async () => {
       try {
@@ -226,7 +224,6 @@ function BlogContent() {
 
   const displayTags = pinnedTags.length > 0 ? pinnedTags : popularTags.slice(0, 10);
 
-  // 시간 포맷팅 함수
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -561,7 +558,7 @@ function BlogContent() {
           </div>
         )}
 
-        {/* 포스트 리스트 - 당근마켓 스타일 */}
+        {/* 포스트 리스트 - 글 정보 아래로 */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {(posts || []).map((post, index) => {
             const thumbnail = extractThumbnail(post.content, post.previewImage);
@@ -575,114 +572,112 @@ function BlogContent() {
               >
                 <article 
                   style={{
-                    display: 'flex',
-                    gap: '16px',
                     padding: '16px 0',
                     borderBottom: '1px solid #f0f0f0',
                     cursor: 'pointer',
                   }}
                 >
-                  {/* 좌측: 콘텐츠 영역 */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* 제목 */}
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      lineHeight: 1.4,
-                      marginBottom: '6px',
-                      color: '#212121',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {post.title}
-                    </h3>
-                    
-                    {/* 본문 미리보기 */}
-                    <p style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      lineHeight: 1.5,
-                      marginBottom: '10px',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}>
-                      {previewText}
-                    </p>
-                    
-                    {/* 메타 정보 */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '13px',
-                      color: '#999',
-                    }}>
-                      <span style={{ color: '#666' }}>{post.author?.name}</span>
-                      <span>·</span>
-                      <span>{formatTime(post.publishedAt)}</span>
-                      <span>·</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <Eye size={14} /> {post.viewCount}
-                      </span>
-                      
-                      {/* 우측 정렬: 좋아요, 댓글 */}
-                      <div style={{ 
-                        marginLeft: 'auto', 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        gap: '10px',
+                  {/* 상단: 제목 + 썸네일 */}
+                  <div style={{ 
+                    display: 'flex',
+                    gap: '16px',
+                    marginBottom: '12px',
+                  }}>
+                    {/* 좌측: 제목 + 본문 미리보기 */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        lineHeight: 1.4,
+                        marginBottom: '6px',
+                        color: '#212121',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}>
-                        {post.commentCount > 0 && (
-                          <span style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '3px',
-                            color: '#666',
-                          }}>
-                            <MessageCircle size={14} />
-                            {post.commentCount}
-                          </span>
-                        )}
-                        {post.likeCount > 0 && (
-                          <span style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '3px',
-                            color: '#ff6f0f',
-                            fontWeight: '500',
-                          }}>
-                            <Heart size={14} fill="#ff6f0f" />
-                            {post.likeCount}
-                          </span>
-                        )}
-                      </div>
+                        {post.title}
+                      </h3>
+                      
+                      {previewText && (
+                        <p style={{
+                          fontSize: '14px',
+                          color: '#666',
+                          lineHeight: 1.5,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}>
+                          {previewText}
+                        </p>
+                      )}
                     </div>
+                    
+                    {/* 우측: 썸네일 */}
+                    {thumbnail && (
+                      <div style={{
+                        flexShrink: 0,
+                        width: '88px',
+                        height: '88px',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        background: '#f5f5f5',
+                      }}>
+                        <img 
+                          src={thumbnail}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                   
-                  {/* 우측: 썸네일 */}
-                  {thumbnail && (
-                    <div style={{
-                      flexShrink: 0,
-                      width: '88px',
-                      height: '88px',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      background: '#f5f5f5',
-                    }}>
-                      <img 
-                        src={thumbnail}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
-                    </div>
-                  )}
+                  {/* 하단: 메타 정보 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '13px',
+                    color: '#999',
+                  }}>
+                    <span style={{ color: '#666' }}>{post.author?.name}</span>
+                    <span>·</span>
+                    <span>{formatTime(post.publishedAt)}</span>
+                    <span>·</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <Eye size={14} /> {post.viewCount}
+                    </span>
+                    
+                    {post.commentCount > 0 && (
+                      <>
+                        <span>·</span>
+                        <span style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '2px',
+                        }}>
+                          <MessageCircle size={14} /> {post.commentCount}
+                        </span>
+                      </>
+                    )}
+                    
+                    {post.likeCount > 0 && (
+                      <span style={{ 
+                        marginLeft: 'auto',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '3px',
+                        color: '#ff6f0f',
+                        fontWeight: '500',
+                      }}>
+                        <Heart size={14} fill="#ff6f0f" /> {post.likeCount}
+                      </span>
+                    )}
+                  </div>
                 </article>
               </Link>
             );
@@ -738,20 +733,11 @@ function BlogContent() {
             transition: 'transform 0.2s, box-shadow 0.2s',
             zIndex: 100,
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(15, 98, 254, 0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 98, 254, 0.4)';
-          }}
         >
           <Plus size={28} color="#fff" />
         </button>
       </div>
 
-      {/* 애니메이션 CSS */}
       <style jsx>{`
         @keyframes spin {
           from { transform: rotate(0deg); }

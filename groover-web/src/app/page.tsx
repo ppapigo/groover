@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, Heart, PenLine, TrendingUp } from 'lucide-react';
+import { Eye, Heart, PenLine, TrendingUp, Star } from 'lucide-react';
 
 const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
 
@@ -98,23 +98,26 @@ export default function HomePage() {
             <div className="popular-list">
               {popularPosts.map((post, index) => (
                 <Link key={post.slug} href={`/blog/${post.slug}`} className="popular-item">
-                  <span className="rank">{index + 1}</span>
-                  <div className="popular-content">
-                    <h3 className="popular-title">{post.title}</h3>
-                    <div className="popular-meta">
-                      <span className="author">{post.author?.name}</span>
-                      <span className="dot">·</span>
-                      <span className="time">{formatTime(post.publishedAt)}</span>
-                      <span className="dot">·</span>
-                      <span className="stat">
-                        <Eye size={12} /> {post.viewCount}
+                  <div className="popular-row">
+                    <span className="rank">{index + 1}</span>
+                    <h3 className="popular-title">
+                      {post.title}
+                      <Star size={14} className="star-icon" fill="#FFD700" color="#FFD700" />
+                    </h3>
+                  </div>
+                  <div className="popular-meta">
+                    <span className="author">{post.author?.name}</span>
+                    <span className="dot">·</span>
+                    <span className="time">{formatTime(post.publishedAt)}</span>
+                    <span className="dot">·</span>
+                    <span className="stat">
+                      <Eye size={12} /> {post.viewCount}
+                    </span>
+                    {post.likeCount > 0 && (
+                      <span className="stat like">
+                        <Heart size={12} fill="#ff6f0f" /> {post.likeCount}
                       </span>
-                      {post.likeCount > 0 && (
-                        <span className="stat like">
-                          <Heart size={12} fill="#ff6f0f" /> {post.likeCount}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </Link>
               ))}
@@ -228,8 +231,8 @@ export default function HomePage() {
         }
         .popular-item {
           display: flex;
-          align-items: flex-start;
-          gap: 12px;
+          flex-direction: column;
+          gap: 8px;
           padding: 14px 0;
           border-bottom: 1px solid #f0f0f0;
           text-decoration: none;
@@ -242,33 +245,37 @@ export default function HomePage() {
         .popular-item:active {
           background: #f9f9f9;
         }
+        .popular-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
         .rank {
           flex-shrink: 0;
           width: 24px;
-          height: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 700;
           color: #667eea;
         }
-        .popular-content {
-          flex: 1;
-          min-width: 0;
-        }
         .popular-title {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 6px;
           font-size: 15px;
           font-weight: 600;
           color: #212121;
-          margin-bottom: 6px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        .popular-title :global(.star-icon) {
+          flex-shrink: 0;
+        }
         .popular-meta {
           display: flex;
           align-items: center;
+          justify-content: flex-end;
           flex-wrap: wrap;
           gap: 4px;
           font-size: 12px;
