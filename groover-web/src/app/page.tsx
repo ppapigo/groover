@@ -224,6 +224,7 @@ export default function HomePage() {
           flex: 0 0 160px;
           min-width: 160px;
           max-width: 160px;
+          width: 160px;
           background: white;
           border-radius: 12px;
           overflow: hidden;
