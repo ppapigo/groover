@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, Heart, PenLine, TrendingUp, Star } from 'lucide-react';
+import { Eye, Heart, PenLine, TrendingUp } from 'lucide-react';
 
 const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
 
@@ -98,27 +98,27 @@ export default function HomePage() {
             <div className="popular-list">
               {popularPosts.map((post, index) => (
                 <Link key={post.slug} href={`/blog/${post.slug}`} className="popular-item">
-                  <div className="popular-row">
-                    <span className="rank">{index + 1}</span>
-                    <h3 className="popular-title">
-                      {post.title}
-                      <Star size={14} className="star-icon" fill="#FFD700" color="#FFD700" />
-                    </h3>
-                  </div>
-                  <div className="popular-meta">
-                    <span className="author">{post.author?.name}</span>
-                    <span className="dot">·</span>
-                    <span className="time">{formatTime(post.publishedAt)}</span>
-                    <span className="dot">·</span>
-                    <span className="stat">
-                      <Eye size={12} /> {post.viewCount}
-                    </span>
-                    {post.likeCount > 0 && (
-                      <span className="stat like">
-                        <Heart size={12} fill="#ff6f0f" /> {post.likeCount}
+                  <div className="popular-content">
+                    <div className="popular-row">
+                      <span className="rank">{index + 1}</span>
+                      <h3 className="popular-title">{post.title}</h3>
+                    </div>
+                    <div className="popular-meta">
+                      <span className="author">{post.author?.name}</span>
+                      <span className="dot">·</span>
+                      <span className="time">{formatTime(post.publishedAt)}</span>
+                      <span className="dot">·</span>
+                      <span className="stat">
+                        <Eye size={12} /> {post.viewCount}
                       </span>
-                    )}
+                      {post.likeCount > 0 && (
+                        <span className="stat like">
+                          <Heart size={12} fill="#ff6f0f" /> {post.likeCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <div className="divider"></div>
                 </Link>
               ))}
             </div>
@@ -232,18 +232,18 @@ export default function HomePage() {
         .popular-item {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          padding: 14px 0;
-          border-bottom: 1px solid #f0f0f0;
           text-decoration: none;
           color: inherit;
           transition: background 0.15s;
         }
-        .popular-item:last-child {
-          border-bottom: none;
-        }
         .popular-item:active {
           background: #f9f9f9;
+        }
+        .popular-content {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 14px 0;
         }
         .popular-row {
           display: flex;
@@ -259,18 +259,12 @@ export default function HomePage() {
         }
         .popular-title {
           flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 6px;
           font-size: 15px;
           font-weight: 600;
           color: #212121;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        }
-        .popular-title :global(.star-icon) {
-          flex-shrink: 0;
         }
         .popular-meta {
           display: flex;
@@ -295,6 +289,14 @@ export default function HomePage() {
         .stat.like {
           color: #ff6f0f;
           font-weight: 500;
+        }
+        .divider {
+          height: 1px;
+          background: #f0f0f0;
+          margin: 0;
+        }
+        .popular-item:last-child .divider {
+          display: none;
         }
         
         .loading {
