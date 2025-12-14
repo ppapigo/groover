@@ -135,22 +135,23 @@ function WriteContent() {
   }, [tagInput, tags]);
 
   // 외부 클릭 시 자동완성 닫기
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(e.target as Node) &&
-        tagInputRef.current &&
-        !tagInputRef.current.contains(e.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-      setShowStatusDropdown(false);
-    };
+  // 외부 클릭 시 자동완성 닫기 - 수정
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (
+      suggestionsRef.current &&
+      !suggestionsRef.current.contains(e.target as Node) &&
+      tagInputRef.current &&
+      !tagInputRef.current.contains(e.target as Node)
+    ) {
+      setShowSuggestions(false);
+    }
+    // 구매상태 드롭다운은 여기서 닫지 않음 (버튼 자체에서 처리)
+  };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   const fetchPost = async (id: string) => {
     setIsLoading(true);

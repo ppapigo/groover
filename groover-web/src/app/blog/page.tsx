@@ -209,30 +209,30 @@ function BlogContent() {
   };
 
   const handleDelete = async (e: React.MouseEvent, postSlug: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setOpenMenuId(null);
-    
-    if (!confirm('정말 이 글을 삭제하시겠습니까?')) return;
-    
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/posts/${postSlug}`,
-        { 
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      if (res.ok) {
-        fetchPosts(null);
-      } else {
-        alert('삭제에 실패했습니다.');
+  e.preventDefault();
+  e.stopPropagation();
+  setOpenMenuId(null);
+  
+  if (!confirm('정말 이 글을 삭제하시겠습니까?')) return;
+  
+  try {
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${postSlug}`,
+      { 
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
       }
-    } catch (err) {
-      alert('삭제 중 오류가 발생했습니다.');
+    );
+    if (res.ok) {
+      fetchPosts(null);
+    } else {
+      alert('삭제에 실패했습니다.');
     }
-  };
+  } catch (err) {
+    alert('삭제 중 오류가 발생했습니다.');
+  }
+};
 
   const handleReport = (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
