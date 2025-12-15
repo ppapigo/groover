@@ -1,32 +1,21 @@
 // src/email/email.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
 
   constructor(private configService: ConfigService) {
-  this.transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: this.configService.get('GMAIL_USER'),
-      pass: this.configService.get('GMAIL_APP_PASSWORD'),
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  });
+    this.resend = new Resend(this.configService.get('RESEND_API_KEY'));
+    this.fromEmail = 'Groover <onboarding@resend.dev>';
+    this.frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
+  }
 
-  this.fromEmail = this.configService.get('EMAIL_FROM') || 'noreply@grooverapp.com';
-  this.frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
-}
   async sendVerificationEmail(email: string, token: string, name?: string): Promise<boolean> {
     const verifyUrl = `${this.frontendUrl}/auth/verify?token=${token}`;
 
@@ -43,7 +32,6 @@ export class EmailService {
           .title { font-size: 24px; font-weight: 600; color: #333; margin-bottom: 16px; }
           .text { font-size: 16px; color: #666; line-height: 1.6; margin-bottom: 24px; }
           .button { display: inline-block; padding: 14px 32px; background: #0f62fe; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; }
-          .button:hover { background: #0043ce; }
           .footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid #eee; font-size: 14px; color: #999; }
           .link { color: #0f62fe; word-break: break-all; }
         </style>
@@ -71,28 +59,18 @@ export class EmailService {
       </html>
     `;
 
-    const text = `
-Groover 이메일 인증
-
-안녕하세요${name ? ` ${name}` : ''}님!
-
-Groover에 가입해 주셔서 감사합니다.
-아래 링크를 클릭하여 이메일 인증을 완료해주세요:
-
-${verifyUrl}
-
-이 링크는 24시간 동안 유효합니다.
-본인이 가입하지 않으셨다면 이 메일을 무시해주세요.
-    `;
-
     try {
-      await this.transporter.sendMail({
-        from: `"Groover" <${this.configService.get('GMAIL_USER')}>`,
+      const { error } = await this.resend.emails.send({
+        from: this.fromEmail,
         to: email,
         subject: '[Groover] 이메일 인증을 완료해주세요',
-        text,
         html,
       });
+
+      if (error) {
+        this.logger.error(`이메일 발송 실패: ${email}`, error);
+        return false;
+      }
 
       this.logger.log(`인증 이메일 발송 완료: ${email}`);
       return true;
@@ -143,12 +121,17 @@ ${verifyUrl}
     `;
 
     try {
-      await this.transporter.sendMail({
-        from: `"Groover" <${this.configService.get('GMAIL_USER')}>`,
+      const { error } = await this.resend.emails.send({
+        from: this.fromEmail,
         to: email,
         subject: '[Groover] 비밀번호 재설정',
         html,
       });
+
+      if (error) {
+        this.logger.error(`이메일 발송 실패: ${email}`, error);
+        return false;
+      }
 
       this.logger.log(`비밀번호 재설정 이메일 발송: ${email}`);
       return true;
