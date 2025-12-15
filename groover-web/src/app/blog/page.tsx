@@ -27,47 +27,40 @@ function extractThumbnail(content: string, previewImage?: string): string | null
   return match ? match[1] : null;
 }
 
-// 본문 미리보기 추출 함수
-function extractPreview(content: string, maxLength: number = 80): string {
-  if (!content) return '';
-  
-  let text = content;
-  
-  // 마크다운 이미지 제거 (![...](url) 형식)
-  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-  
-  // HTML 이미지 태그 제거
-  text = text.replace(/<img[^>]*>/gi, '');
-  
-  // 마크다운 링크를 텍스트로 변환 [text](url) -> text
-  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  
-  // 마크다운 문법 제거
-  text = text.replace(/^#{1,6}\s+/gm, '');
-  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
-  text = text.replace(/\*([^*]+)\*/g, '$1');
-  text = text.replace(/__([^_]+)__/g, '$1');
-  text = text.replace(/_([^_]+)_/g, '$1');
-  text = text.replace(/~~([^~]+)~~/g, '$1');
-  text = text.replace(/`([^`]+)`/g, '$1');
-  text = text.replace(/^>\s*/gm, '');
-  text = text.replace(/^[-*+]\s+/gm, '');
-  text = text.replace(/^\d+\.\s+/gm, '');
-  
-  // URL 제거
-  text = text.replace(/https?:\/\/[^\s]+/g, '');
-  
-  // 공백 정리
-  text = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
-  
-  // 빈 문자열이면 반환
+// 텍스트에서 마크다운/URL 제거
+function cleanPreviewText(text: string): string {
   if (!text) return '';
   
-  // 길이 제한
-  if (text.length > maxLength) {
-    return text.slice(0, maxLength) + '...';
-  }
-  return text;
+  let cleaned = text;
+  
+  // 마크다운 이미지 제거 ![...](url)
+  cleaned = cleaned.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+  
+  // HTML 이미지 태그 제거
+  cleaned = cleaned.replace(/<img[^>]*>/gi, '');
+  
+  // 마크다운 링크를 텍스트로 변환 [text](url) -> text
+  cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  
+  // URL 제거
+  cleaned = cleaned.replace(/https?:\/\/[^\s)]+/g, '');
+  
+  // 마크다운 문법 제거
+  cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+  cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+  cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
+  cleaned = cleaned.replace(/~~([^~]+)~~/g, '$1');
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+  cleaned = cleaned.replace(/^>\s*/gm, '');
+  cleaned = cleaned.replace(/^[-*+]\s+/gm, '');
+  cleaned = cleaned.replace(/^\d+\.\s+/gm, '');
+  
+  // 공백 정리
+  cleaned = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
 }
 
 // 구매 상태 색상
@@ -249,7 +242,7 @@ function BlogContent() {
     router.push(`/write?edit=${postSlug}`);
   };
 
-  const handleDelete = async (e: React.MouseEvent, postSlug: string) => {
+  const handleDelete = async (e: React.MouseEvent, postId: string) => {
     e.preventDefault();
     e.stopPropagation();
     setOpenMenuId(null);
@@ -259,7 +252,7 @@ function BlogContent() {
     try {
       const token = localStorage.getItem('accessToken');
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${postSlug}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${postId}`,
         { 
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` }
@@ -671,10 +664,10 @@ function BlogContent() {
             const metadata = post.metadata || {};
             const summary = metadata.summary || '';
             const purchaseStatus = metadata.purchaseStatus || '';
-            const priceRange = metadata.priceRange || '';
             
-            // 미리보기 텍스트 결정
-            const previewText = summary || post.excerpt || extractPreview(post.content);
+            // 미리보기 텍스트 결정 (마크다운/URL 제거)
+            const rawPreview = summary || post.excerpt || post.content || '';
+            const previewText = summary ? summary : cleanPreviewText(rawPreview).slice(0, 80);
             
             return (
               <article 
@@ -839,7 +832,7 @@ function BlogContent() {
                               수정
                             </button>
                             <button
-                              onClick={(e) => handleDelete(e, post.slug)}
+                              onClick={(e) => handleDelete(e, post.id)}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
