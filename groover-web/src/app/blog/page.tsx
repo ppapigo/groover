@@ -30,10 +30,18 @@ function extractThumbnail(content: string, previewImage?: string): string | null
 // 본문 미리보기 추출 함수
 function extractPreview(content: string, maxLength: number = 80): string {
   if (!content) return '';
-  // 마크다운 이미지 제거
-  let text = content.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-  // 마크다운 링크를 텍스트로 변환
+  
+  let text = content;
+  
+  // 마크다운 이미지 제거 (![...](url) 형식)
+  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+  
+  // HTML 이미지 태그 제거
+  text = text.replace(/<img[^>]*>/gi, '');
+  
+  // 마크다운 링크를 텍스트로 변환 [text](url) -> text
   text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  
   // 마크다운 문법 제거
   text = text.replace(/^#{1,6}\s+/gm, '');
   text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
@@ -45,8 +53,16 @@ function extractPreview(content: string, maxLength: number = 80): string {
   text = text.replace(/^>\s*/gm, '');
   text = text.replace(/^[-*+]\s+/gm, '');
   text = text.replace(/^\d+\.\s+/gm, '');
+  
+  // URL 제거
+  text = text.replace(/https?:\/\/[^\s]+/g, '');
+  
   // 공백 정리
   text = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // 빈 문자열이면 반환
+  if (!text) return '';
+  
   // 길이 제한
   if (text.length > maxLength) {
     return text.slice(0, maxLength) + '...';
