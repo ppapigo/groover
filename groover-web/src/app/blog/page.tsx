@@ -21,12 +21,37 @@ interface FeedTag {
 // 썸네일 이미지 추출 함수
 function extractThumbnail(content: string, previewImage?: string): string | null {
   if (previewImage) return previewImage;
-  
   if (!content) return null;
-  
   const regex = /!\[.*?\]\((.*?)\)/;
   const match = regex.exec(content);
   return match ? match[1] : null;
+}
+
+// 본문 미리보기 추출 함수
+function extractPreview(content: string, maxLength: number = 80): string {
+  if (!content) return '';
+  // 마크다운 이미지 제거
+  let text = content.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+  // 마크다운 링크를 텍스트로 변환
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // 마크다운 문법 제거
+  text = text.replace(/^#{1,6}\s+/gm, '');
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+  text = text.replace(/\*([^*]+)\*/g, '$1');
+  text = text.replace(/__([^_]+)__/g, '$1');
+  text = text.replace(/_([^_]+)_/g, '$1');
+  text = text.replace(/~~([^~]+)~~/g, '$1');
+  text = text.replace(/`([^`]+)`/g, '$1');
+  text = text.replace(/^>\s*/gm, '');
+  text = text.replace(/^[-*+]\s+/gm, '');
+  text = text.replace(/^\d+\.\s+/gm, '');
+  // 공백 정리
+  text = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  // 길이 제한
+  if (text.length > maxLength) {
+    return text.slice(0, maxLength) + '...';
+  }
+  return text;
 }
 
 // 구매 상태 색상
@@ -209,30 +234,30 @@ function BlogContent() {
   };
 
   const handleDelete = async (e: React.MouseEvent, postSlug: string) => {
-  e.preventDefault();
-  e.stopPropagation();
-  setOpenMenuId(null);
-  
-  if (!confirm('정말 이 글을 삭제하시겠습니까?')) return;
-  
-  try {
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${postSlug}`,
-      { 
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(null);
+    
+    if (!confirm('정말 이 글을 삭제하시겠습니까?')) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/blog/posts/${postSlug}`,
+        { 
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      if (res.ok) {
+        fetchPosts(null);
+      } else {
+        alert('삭제에 실패했습니다.');
       }
-    );
-    if (res.ok) {
-      fetchPosts(null);
-    } else {
-      alert('삭제에 실패했습니다.');
+    } catch (err) {
+      alert('삭제 중 오류가 발생했습니다.');
     }
-  } catch (err) {
-    alert('삭제 중 오류가 발생했습니다.');
-  }
-};
+  };
 
   const handleReport = (e: React.MouseEvent, postSlug: string) => {
     e.preventDefault();
@@ -632,6 +657,9 @@ function BlogContent() {
             const purchaseStatus = metadata.purchaseStatus || '';
             const priceRange = metadata.priceRange || '';
             
+            // 미리보기 텍스트 결정
+            const previewText = summary || post.excerpt || extractPreview(post.content);
+            
             return (
               <article 
                 key={post.slug}
@@ -725,28 +753,17 @@ function BlogContent() {
                       {post.title}
                     </h3>
                     
-                    {/* 핵심 한 줄 요약 (본문 미리보기 대신) */}
-                    {summary ? (
+                    {/* 미리보기 텍스트 */}
+                    {previewText && (
                       <p style={{
                         fontSize: '14px',
-                        color: '#0f62fe',
+                        color: summary ? '#0f62fe' : '#666',
                         lineHeight: 1.5,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}>
-                        💬 {summary}
-                      </p>
-                    ) : (
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        lineHeight: 1.5,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {priceRange && `💰 ${priceRange}`}
+                        {summary ? `💬 ${previewText}` : previewText}
                       </p>
                     )}
                   </Link>

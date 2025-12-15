@@ -19,6 +19,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,7 +28,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 초기 로드 - 저장된 토큰으로 사용자 정보 가져오기
+  // 유저 정보 새로고침
+  const refreshUser = useCallback(async () => {
+    const token = getAccessToken();
+    if (token) {
+      try {
+        const response = await api.get('/auth/me');
+        setUser(response.data.data);
+      } catch (error) {
+        setAccessToken(null);
+        setUser(null);
+      }
+    }
+  }, []);
+
+  // 초기 로드 - 저장된 토큰으로 유저 정보 가져오기
   useEffect(() => {
     const initAuth = async () => {
       const token = getAccessToken();
@@ -38,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           // 토큰 만료 시 자동으로 갱신 시도 (인터셉터에서 처리)
           setAccessToken(null);
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -47,27 +63,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 로그인
-  // 로그인
-const login = useCallback(async (loginData: { email?: string; userId?: string; password: string }) => {
-  const response = await api.post('/auth/login', loginData);
-  const { user, accessToken } = response.data.data;
-  
-  setAccessToken(accessToken);
-  setUser(user);
-}, []);
+  const login = useCallback(async (loginData: { email?: string; userId?: string; password: string }) => {
+    const response = await api.post('/auth/login', loginData);
+    const { user, accessToken } = response.data.data;
+    setAccessToken(accessToken);
+    setUser(user);
+  }, []);
+
   // 회원가입
- // 회원가입 - 이메일 인증 필요
-const register = useCallback(async (email: string, password: string, name: string) => {
-  const response = await api.post('/auth/register', { email, password, name });
-  // 이메일 인증 전이므로 토큰 저장 안 함
-  return response.data;
-}, []);
+  const register = useCallback(async (email: string, password: string, name: string) => {
+    const response = await api.post('/auth/register', { email, password, name });
+    return response.data;
+  }, []);
+
   // 로그아웃
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
     } catch (error) {
-      // 에러 무시 (이미 로그아웃된 상태일 수 있음)
+      // 에러 무시
     }
     setAccessToken(null);
     setUser(null);
@@ -94,6 +108,7 @@ const register = useCallback(async (email: string, password: string, name: strin
         register,
         logout,
         logoutAll,
+        refreshUser,
       }}
     >
       {children}

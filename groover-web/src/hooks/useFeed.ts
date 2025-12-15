@@ -32,9 +32,9 @@ interface Post {
   publishedAt: string;
   createdAt: string;
   slug: string;
+  excerpt?: string;  // 추가
   score?: number;
 }
-
 interface FeedResponse {
   items: Post[];
   nextCursor: string | null;
