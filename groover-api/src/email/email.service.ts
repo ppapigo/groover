@@ -12,7 +12,7 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     this.resend = new Resend(this.configService.get('RESEND_API_KEY'));
-    this.fromEmail = 'Groover <onboarding@resend.dev>';
+   this.fromEmail = 'Groover <noreply@grooverapp.com>';
     this.frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
   }
 
