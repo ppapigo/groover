@@ -11,18 +11,22 @@ export class EmailService {
   private readonly frontendUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: this.configService.get('GMAIL_USER'),
-        pass: this.configService.get('GMAIL_APP_PASSWORD'),
-      },
-    });
+  this.transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: this.configService.get('GMAIL_USER'),
+      pass: this.configService.get('GMAIL_APP_PASSWORD'),
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  });
 
-    this.fromEmail = this.configService.get('EMAIL_FROM') || 'noreply@grooverapp.com';
-    this.frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
-  }
-
+  this.fromEmail = this.configService.get('EMAIL_FROM') || 'noreply@grooverapp.com';
+  this.frontendUrl = this.configService.get('FRONTEND_URL') || 'https://www.grooverapp.com';
+}
   async sendVerificationEmail(email: string, token: string, name?: string): Promise<boolean> {
     const verifyUrl = `${this.frontendUrl}/auth/verify?token=${token}`;
 
