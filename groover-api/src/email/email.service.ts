@@ -1,21 +1,21 @@
 // src/email/email.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private sesClient: SESClient;
+  private transporter: nodemailer.Transporter;
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.sesClient = new SESClient({
-      region: this.configService.get('AWS_REGION') || 'ap-southeast-2',
-      credentials: {
-        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: this.configService.get('GMAIL_USER'),
+        pass: this.configService.get('GMAIL_APP_PASSWORD'),
       },
     });
 
@@ -82,30 +82,14 @@ ${verifyUrl}
     `;
 
     try {
-      const command = new SendEmailCommand({
-        Source: this.fromEmail,
-        Destination: {
-          ToAddresses: [email],
-        },
-        Message: {
-          Subject: {
-            Data: '[Groover] 이메일 인증을 완료해주세요',
-            Charset: 'UTF-8',
-          },
-          Body: {
-            Html: {
-              Data: html,
-              Charset: 'UTF-8',
-            },
-            Text: {
-              Data: text,
-              Charset: 'UTF-8',
-            },
-          },
-        },
+      await this.transporter.sendMail({
+        from: `"Groover" <${this.configService.get('GMAIL_USER')}>`,
+        to: email,
+        subject: '[Groover] 이메일 인증을 완료해주세요',
+        text,
+        html,
       });
 
-      await this.sesClient.send(command);
       this.logger.log(`인증 이메일 발송 완료: ${email}`);
       return true;
     } catch (error) {
@@ -155,26 +139,13 @@ ${verifyUrl}
     `;
 
     try {
-      const command = new SendEmailCommand({
-        Source: this.fromEmail,
-        Destination: {
-          ToAddresses: [email],
-        },
-        Message: {
-          Subject: {
-            Data: '[Groover] 비밀번호 재설정',
-            Charset: 'UTF-8',
-          },
-          Body: {
-            Html: {
-              Data: html,
-              Charset: 'UTF-8',
-            },
-          },
-        },
+      await this.transporter.sendMail({
+        from: `"Groover" <${this.configService.get('GMAIL_USER')}>`,
+        to: email,
+        subject: '[Groover] 비밀번호 재설정',
+        html,
       });
 
-      await this.sesClient.send(command);
       this.logger.log(`비밀번호 재설정 이메일 발송: ${email}`);
       return true;
     } catch (error) {
