@@ -435,12 +435,27 @@ export class BlogService {
     return null;
   }
 
-  private generateExcerpt(content: string, maxLength: number = 150): string {
-    const text = content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength).trim() + '...';
-  }
-
+ private generateExcerpt(content: string, maxLength: number = 150): string {
+  let text = content;
+  
+  // 마크다운 이미지 제거 ![...](url)
+  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+  
+  // HTML 태그 제거
+  text = text.replace(/<[^>]+>/g, '');
+  
+  // 마크다운 링크 텍스트만 남기기 [text](url) -> text
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  
+  // URL 제거
+  text = text.replace(/https?:\/\/[^\s]+/g, '');
+  
+  // 공백 정리
+  text = text.replace(/\s+/g, ' ').trim();
+  
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trim() + '...';
+}
   private formatPost(post: any) {
     return {
       id: post.id,
