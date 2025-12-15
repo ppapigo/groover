@@ -25,23 +25,23 @@ import { TagsModule } from './tags/tags.module';
       envFilePath: ['.env.local', '.env'],
     }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        name: 'short',
-        ttl: 1000,
-        limit: 3,
-      },
-      {
-        name: 'medium',
-        ttl: 10000,
-        limit: 20,
-      },
-      {
-        name: 'long',
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+   ThrottlerModule.forRoot([
+  {
+    name: 'short',
+    ttl: 1000,
+    limit: 10,  // 1초에 10번
+  },
+  {
+    name: 'medium',
+    ttl: 10000,
+    limit: 50,  // 10초에 50번
+  },
+  {
+    name: 'long',
+    ttl: 60000,
+    limit: 200,  // 1분에 200번
+  },
+]),
     // Core
     PrismaModule,
     AuthModule,
