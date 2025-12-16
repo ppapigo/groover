@@ -11,37 +11,50 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, fallback }: AuthGuardProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    // 로딩 중이면 대기
-    if (isLoading) return;
+    const checkAuth = async () => {
+      // 로딩 중이면 대기
+      if (isLoading) return;
 
-    // 토큰이 있는지 확인
-    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+      const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
 
-    if (!user && !hasToken) {
-      // 유저도 없고 토큰도 없으면 로그인으로
-      const redirectUrl = encodeURIComponent(pathname);
-      router.push(`/login?redirect=${redirectUrl}`);
-    } else if (user) {
-      // user가 로드되면 checked
+      if (!hasToken) {
+        // 토큰 없으면 로그인으로
+        const redirectUrl = encodeURIComponent(pathname);
+        router.push(`/login?redirect=${redirectUrl}`);
+        return;
+      }
+
+      if (!user && hasToken) {
+        // 토큰은 있는데 user가 없으면 다시 로드
+        await refreshUser();
+      }
+
       setChecked(true);
-    }
-    // 토큰은 있지만 user가 아직 없으면 계속 대기
-  }, [isLoading, user, router, pathname]);
+    };
 
-  // 로딩 중이거나 user가 아직 없으면 로딩 표시
-  if (isLoading || !user) {
+    checkAuth();
+  }, [isLoading, user, router, pathname, refreshUser]);
+
+  // 로딩 중이거나 체크 안 됐으면 로딩 표시
+  if (isLoading || !checked) {
     return fallback || (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
+  }
+
+  // 토큰 없고 user도 없으면 null (리다이렉트 중)
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+  if (!user && !hasToken) {
+    return null;
   }
 
   return <>{children}</>;
