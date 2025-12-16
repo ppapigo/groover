@@ -81,22 +81,23 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const fetchConversation = async () => {
+ const fetchConversation = async () => {
   try {
-    // 스레드 정보 가져오기
     const threadRes = await api.get('/dm/threads/' + params.id);
     setParticipant(threadRes.data.data?.partner || threadRes.data.partner || threadRes.data);
 
-    // 메시지 목록 가져오기
     const messagesRes = await api.get('/dm/threads/' + params.id + '/messages');
     const messagesData = messagesRes.data.data?.items || messagesRes.data.items || messagesRes.data.data || messagesRes.data || [];
+    
+    // 디버깅용 로그
+    console.log('=== DM 디버그 ===');
+    console.log('현재 유저 ID:', user?.id);
+    console.log('메시지 데이터:', messagesData);
+    
     setMessages(Array.isArray(messagesData) ? messagesData : []);
-
     if (isConnected) markAsRead(params.id);
   } catch (err) {
     console.error('대화 불러오기 실패:', err);
-    setParticipant({ id: 'user1', name: '사용자', profileImageUrl: null });
-    setMessages([]);
   } finally {
     setIsLoading(false);
   }
