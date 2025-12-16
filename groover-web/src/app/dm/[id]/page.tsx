@@ -36,7 +36,7 @@ interface MessageBubbleProps {
 }
 
 function MessageBubble({ message, currentUserId }: MessageBubbleProps) {
-  const isMe = message.sender.id === currentUserId;
+  const isMe = message.sender?.id === currentUserId;
   
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('ko-KR', { 
@@ -47,7 +47,7 @@ function MessageBubble({ message, currentUserId }: MessageBubbleProps) {
 
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-slide-up`}>
-      <div className="max-w-[75%]">
+      <div className={`flex items-end gap-1.5 max-w-[75%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
         <div
           className={`
             px-4 py-2.5 text-[15px] leading-relaxed
@@ -59,9 +59,14 @@ function MessageBubble({ message, currentUserId }: MessageBubbleProps) {
         >
           {message.content}
         </div>
-        <p className={`text-[11px] text-text-tertiary mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
-          {formatTime(message.createdAt)}
-        </p>
+        <div className={`flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
+          {isMe && !message.isRead && (
+            <span className="text-[11px] text-yellow-500 font-semibold">1</span>
+          )}
+          <span className="text-[11px] text-text-tertiary">
+            {formatTime(message.createdAt)}
+          </span>
+        </div>
       </div>
     </div>
   );
