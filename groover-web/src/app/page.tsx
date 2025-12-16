@@ -35,7 +35,6 @@ export default function HomePage() {
       setTrendingTags(tags);
     } catch (err) {
       console.error('인기 태그 불러오기 실패:', err);
-      // 실패 시 기본 태그 표시
       setTrendingTags([
         { name: '전자기기', postCount: 0 },
         { name: '패션', postCount: 0 },
@@ -51,9 +50,10 @@ export default function HomePage() {
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    if (authLoading) return;
-
-    if (!user) {
+    // 토큰이 있으면 바로 이동
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+    
+    if (!user && !hasToken) {
       if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/write');
       }
@@ -90,7 +90,7 @@ export default function HomePage() {
         <section className="hero-section">
           <h1>쇼핑 리뷰 커뮤니티</h1>
           <p>솔직한 리뷰를 추천해 공유하세요</p>
-          <button onClick={handleWriteClick} className="cta-btn" disabled={authLoading}>
+          <button onClick={handleWriteClick} className="cta-btn">
             <PenLine size={18} />
             글 쓰기
           </button>
@@ -210,10 +210,6 @@ export default function HomePage() {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
-        .cta-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
         .tags-section {
           padding: 20px;
         }
@@ -276,7 +272,6 @@ export default function HomePage() {
           color: #667eea;
           text-decoration: none;
         }
-
         .popular-list {
           display: flex;
           flex-direction: column;
@@ -350,7 +345,6 @@ export default function HomePage() {
         .popular-item:last-child .divider {
           display: none;
         }
-
         .loading {
           display: flex;
           justify-content: center;
