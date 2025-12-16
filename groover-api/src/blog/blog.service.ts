@@ -776,4 +776,53 @@ export class BlogService {
 
     return { liked: true, likeCount: comment.likeCount + 1 };
   }
+  async getUserPosts(userId: string, query: FeedQueryDto, currentUserId?: string) {
+  const { cursor, limit = 20 } = query;
+
+  const where: any = {
+    userId,
+    status: 'PUBLISHED',
+  };
+
+  if (cursor) {
+    where.id = { lt: cursor };
+  }
+
+  const posts = await this.prisma.post.findMany({
+    where,
+    take: limit + 1,
+    orderBy: { publishedAt: 'desc' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          profileImageUrl: true,
+        },
+      },
+    },
+  });
+
+  const hasMore = posts.length > limit;
+  const items = hasMore ? posts.slice(0, -1) : posts;
+  const nextCursor = hasMore ? items[items.length - 1]?.id : null;
+
+  return {
+    items: items.map(post => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      previewImage: post.previewImage,
+      tags: post.tags,
+      viewCount: post.viewCount,
+      likeCount: post.likeCount,
+      commentCount: post.commentCount,
+      publishedAt: post.publishedAt,
+      author: post.user,
+    })),
+    nextCursor,
+    hasMore,
+  };
+}
 }

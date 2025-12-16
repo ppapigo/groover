@@ -360,4 +360,21 @@ export class BlogController {
       data: result,
     };
   }
+  /**
+ * 특정 유저의 글 목록
+ * GET /v1/blog/users/:userId/posts
+ */
+@Get('users/:userId/posts')
+@UseGuards(OptionalJwtAuthGuard)
+async getUserPosts(
+  @Request() req,
+  @Param('userId') userId: string,
+  @Query() query: FeedQueryDto,
+) {
+  const result = await this.blogService.getUserPosts(userId, query, req.user?.id);
+  return {
+    success: true,
+    data: result,
+  };
+}
 }
