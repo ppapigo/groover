@@ -3,9 +3,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import DmMenu from '@/components/dm/DmMenu';
 import ReportModal from '@/components/dm/ReportModal';
+import { Plus, Search, X } from 'lucide-react';
+import api from '@/lib/api';
 
 interface Partner {
   id: string;
@@ -20,6 +23,12 @@ interface Thread {
   lastMessageAt: string;
   unreadCount: number;
   isBlocked?: boolean;
+}
+
+interface SearchUser {
+  id: string;
+  name: string;
+  profileImageUrl?: string;
 }
 
 interface ThreadCardProps {
@@ -55,7 +64,7 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
       `}
     >
       <Link
-        href={thread.isBlocked ? '#' : `/dm/${thread.id}`}
+        href={thread.isBlocked ? '#' : `/messages/${thread.id}`}
         className="flex items-center gap-3 flex-1 min-w-0"
       >
         <div className="relative w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl bg-card-soft overflow-hidden">
@@ -114,27 +123,65 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
 }
 
 export default function DmPage() {
+  const router = useRouter();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
+  
+  // 새 대화 시작 관련
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    const fetchThreads = async () => {
-      try {
-        const res = await fetch('/api/v1/dm/threads');
-        const data = await res.json();
-        setThreads(data.data?.items || []);
-      } catch (error) {
-        console.error('Failed to fetch threads:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchThreads();
   }, []);
+
+  const fetchThreads = async () => {
+    try {
+      const res = await api.get('/dm/threads');
+      setThreads(res.data.data?.items || []);
+    } catch (error) {
+      console.error('Failed to fetch threads:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const res = await api.get(`/users/search?q=${encodeURIComponent(query)}`);
+      setSearchResults(res.data.data || res.data || []);
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleStartChat = async (targetUserId: string) => {
+    try {
+      const res = await api.post('/dm/start', { targetUserId });
+      const threadId = res.data.data?.id || res.data.id;
+      setShowNewChat(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      router.push(`/messages/${threadId}`);
+    } catch (error) {
+      console.error('Failed to start chat:', error);
+      alert('대화를 시작할 수 없습니다.');
+    }
+  };
 
   const handleMenuOpen = (thread: Thread, e: React.MouseEvent) => {
     e.preventDefault();
@@ -147,12 +194,7 @@ export default function DmPage() {
     if (!selectedThread) return;
     
     try {
-      await fetch('/api/v1/dm/block', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId: selectedThread.partner.id }),
-      });
-      
+      await api.post('/dm/block', { targetUserId: selectedThread.partner.id });
       setThreads(threads.map(t =>
         t.id === selectedThread.id ? { ...t, isBlocked: true } : t
       ));
@@ -167,12 +209,7 @@ export default function DmPage() {
     if (!selectedThread) return;
     
     try {
-      await fetch('/api/v1/dm/unblock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId: selectedThread.partner.id }),
-      });
-      
+      await api.post('/dm/unblock', { targetUserId: selectedThread.partner.id });
       setThreads(threads.map(t =>
         t.id === selectedThread.id ? { ...t, isBlocked: false } : t
       ));
@@ -187,16 +224,11 @@ export default function DmPage() {
     if (!selectedThread) return;
     
     try {
-      await fetch('/api/v1/dm/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUserId: selectedThread.partner.id,
-          type,
-          description,
-        }),
+      await api.post('/dm/report', {
+        targetUserId: selectedThread.partner.id,
+        type,
+        description,
       });
-      
       setShowReport(false);
       setShowMenu(false);
       alert('신고가 접수되었습니다.');
@@ -232,10 +264,11 @@ export default function DmPage() {
               )}
             </div>
             
-            <button className="w-10 h-10 flex items-center justify-center text-text-secondary hover:bg-card-soft rounded-full transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+            <button 
+              onClick={() => setShowNewChat(true)}
+              className="w-10 h-10 flex items-center justify-center text-white bg-primary hover:bg-primary-dark rounded-full transition-colors"
+            >
+              <Plus size={24} />
             </button>
           </div>
         </div>
@@ -253,14 +286,82 @@ export default function DmPage() {
             </div>
           ))
         ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">💬</div>
-            <p className="empty-state-text">
-              아직 메시지가 없습니다
-            </p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="text-6xl mb-4">💬</div>
+            <p className="text-text-secondary mb-4">아직 메시지가 없습니다</p>
+            <button
+              onClick={() => setShowNewChat(true)}
+              className="px-6 py-3 bg-primary text-white rounded-full font-medium"
+            >
+              새 대화 시작하기
+            </button>
           </div>
         )}
       </div>
+
+      {/* 새 대화 시작 모달 */}
+      {showNewChat && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-bold">새 대화</h2>
+              <button 
+                onClick={() => {
+                  setShowNewChat(false);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className="p-2"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="relative">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="이름으로 검색..."
+                  className="w-full pl-12 pr-4 py-3 bg-card-soft rounded-full text-[15px] outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+              {isSearching ? (
+                <div className="text-center py-8 text-text-secondary">검색 중...</div>
+              ) : searchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleStartChat(user.id)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-card-soft rounded-xl transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-card-soft flex items-center justify-center text-xl overflow-hidden">
+                        {user.profileImageUrl ? (
+                          <img src={user.profileImageUrl} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          '👤'
+                        )}
+                      </div>
+                      <span className="font-medium">{user.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : searchQuery ? (
+                <div className="text-center py-8 text-text-secondary">검색 결과가 없습니다</div>
+              ) : (
+                <div className="text-center py-8 text-text-secondary">사용자 이름을 검색하세요</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMenu && selectedThread && (
         <DmMenu
