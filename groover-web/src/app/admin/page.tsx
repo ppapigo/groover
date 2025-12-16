@@ -6,6 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { X } from 'lucide-react';
 
 // 관리자 API 타입
 interface PlatformStats {
@@ -30,6 +31,15 @@ interface UserItem {
   suspendedUntil: string | null;
   createdAt: string;
   postCount: number;
+  role?: string;
+  bio?: string;
+  isVerified?: boolean;
+}
+
+interface UserDetail extends UserItem {
+  followers?: number;
+  following?: number;
+  posts?: any[];
 }
 
 interface ReportItem {
@@ -72,12 +82,18 @@ const adminApi = {
     const res = await api.get(`/admin/users?page=${page}${search ? `&search=${search}` : ''}`);
     return res.data;
   },
+  getUserDetail: async (userId: string) => {
+    const res = await api.get(`/admin/users/${userId}`);
+    return res.data;
+  },
   getReports: async (status?: string) => {
     const res = await api.get(`/admin/reports${status ? `?status=${status}` : ''}`);
     return res.data;
   },
   suspendUser: (userId: string, days: number, reason: string) =>
     api.post(`/admin/users/${userId}/suspend`, { days, reason }),
+  unsuspendUser: (userId: string) =>
+    api.post(`/admin/users/${userId}/unsuspend`),
   warnUser: (userId: string, type: string, reason: string) =>
     api.post(`/admin/users/${userId}/warn`, { type, reason }),
   processReport: (reportId: string, status: string, punishUser?: boolean) =>
@@ -214,6 +230,7 @@ function StatsTab() {
 function UsersTab() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -221,10 +238,36 @@ function UsersTab() {
     queryFn: () => adminApi.getUsers(page, search || undefined),
   });
 
+  const { data: userDetail, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ['admin', 'user', selectedUser],
+    queryFn: () => adminApi.getUserDetail(selectedUser!),
+    enabled: !!selectedUser,
+  });
+
   const suspendMutation = useMutation({
     mutationFn: ({ userId, days, reason }: { userId: string; days: number; reason: string }) =>
       adminApi.suspendUser(userId, days, reason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user', selectedUser] });
+    },
+  });
+
+  const unsuspendMutation = useMutation({
+    mutationFn: (userId: string) => adminApi.unsuspendUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user', selectedUser] });
+    },
+  });
+
+  const warnMutation = useMutation({
+    mutationFn: ({ userId, type, reason }: { userId: string; type: string; reason: string }) =>
+      adminApi.warnUser(userId, type, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user', selectedUser] });
+    },
   });
 
   const handleSuspend = (userId: string) => {
@@ -232,6 +275,19 @@ function UsersTab() {
     const reason = prompt('정지 사유:');
     if (days && reason) {
       suspendMutation.mutate({ userId, days: parseInt(days), reason });
+    }
+  };
+
+  const handleUnsuspend = (userId: string) => {
+    if (confirm('정지를 해제하시겠습니까?')) {
+      unsuspendMutation.mutate(userId);
+    }
+  };
+
+  const handleWarn = (userId: string) => {
+    const reason = prompt('경고 사유:');
+    if (reason) {
+      warnMutation.mutate({ userId, type: 'OTHER', reason });
     }
   };
 
@@ -246,6 +302,7 @@ function UsersTab() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
           placeholder="이메일 또는 이름 검색..."
           className="flex-1 px-4 py-2 border rounded-lg"
         />
@@ -274,7 +331,11 @@ function UsersTab() {
       ) : (
         <div className="space-y-3">
           {users.map((user: UserItem) => (
-            <div key={user.id} className="bg-white rounded-xl p-4">
+            <div
+              key={user.id}
+              className="bg-white rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setSelectedUser(user.id)}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
@@ -287,7 +348,7 @@ function UsersTab() {
                   <div>
                     <p className="font-medium">{user.name || '이름 없음'}</p>
                     <p className="text-sm text-gray-500">{user.email}</p>
-                    <div className="flex gap-2 mt-2 text-xs">
+                    <div className="flex gap-2 mt-2 text-xs flex-wrap">
                       <span className="px-2 py-0.5 bg-gray-100 rounded">
                         게시글: {user.postCount || 0}개
                       </span>
@@ -307,13 +368,7 @@ function UsersTab() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleSuspend(user.id)}
-                  disabled={suspendMutation.isPending}
-                  className="text-sm text-red-600 hover:underline disabled:opacity-50"
-                >
-                  정지
-                </button>
+                <span className="text-gray-400 text-sm">상세보기 →</span>
               </div>
             </div>
           ))}
@@ -338,6 +393,149 @@ function UsersTab() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 유저 상세 모달 */}
+      {selectedUser && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedUser(null)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isLoadingDetail ? (
+              <div className="p-6 text-center">로딩 중...</div>
+            ) : userDetail ? (
+              <>
+                {/* 헤더 */}
+                <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+                  <h3 className="font-bold text-lg">유저 상세정보</h3>
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    className="p-1 hover:bg-gray-100 rounded"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* 프로필 */}
+                <div className="p-4 border-b">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                      {userDetail.profileImageUrl ? (
+                        <img src={userDetail.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl text-gray-400">👤</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold text-lg">{userDetail.name || '이름 없음'}</p>
+                      <p className="text-sm text-gray-500">{userDetail.email}</p>
+                      {userDetail.role && (
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs ${
+                          userDetail.role === 'ADMIN' || userDetail.role === 'SUPER_ADMIN'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {userDetail.role}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {userDetail.bio && (
+                    <p className="mt-3 text-sm text-gray-600">{userDetail.bio}</p>
+                  )}
+                </div>
+
+                {/* 통계 */}
+                <div className="p-4 border-b">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xl font-bold">{userDetail.postCount || 0}</p>
+                      <p className="text-xs text-gray-500">게시글</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold">{userDetail.followers || 0}</p>
+                      <p className="text-xs text-gray-500">팔로워</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold">{userDetail.following || 0}</p>
+                      <p className="text-xs text-gray-500">팔로잉</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 상세 정보 */}
+                <div className="p-4 border-b space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">가입일</span>
+                    <span>{new Date(userDetail.createdAt).toLocaleDateString('ko-KR')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">이메일 인증</span>
+                    <span className={userDetail.isVerified ? 'text-green-600' : 'text-red-600'}>
+                      {userDetail.isVerified ? '완료' : '미완료'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">경고 횟수</span>
+                    <span className={userDetail.warningCount > 0 ? 'text-yellow-600 font-medium' : ''}>
+                      {userDetail.warningCount || 0}회
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">정지 상태</span>
+                    <span className={userDetail.suspendedUntil && new Date(userDetail.suspendedUntil) > new Date() ? 'text-red-600 font-medium' : 'text-green-600'}>
+                      {userDetail.suspendedUntil && new Date(userDetail.suspendedUntil) > new Date()
+                        ? `${new Date(userDetail.suspendedUntil).toLocaleDateString('ko-KR')}까지`
+                        : '정상'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 관리 버튼 */}
+                <div className="p-4 space-y-2">
+                  <div className="flex gap-2">
+                    {userDetail.suspendedUntil && new Date(userDetail.suspendedUntil) > new Date() ? (
+                      <button
+                        onClick={() => handleUnsuspend(userDetail.id)}
+                        disabled={unsuspendMutation.isPending}
+                        className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                      >
+                        정지 해제
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSuspend(userDetail.id)}
+                        disabled={suspendMutation.isPending}
+                        className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                      >
+                        계정 정지
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleWarn(userDetail.id)}
+                      disabled={warnMutation.isPending}
+                      className="flex-1 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      경고 부여
+                    </button>
+                  </div>
+                  <Link
+                    href={`/profile/${userDetail.id}`}
+                    className="block w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium text-center"
+                  >
+                    프로필 페이지로 이동
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="p-6 text-center text-gray-500">유저 정보를 불러올 수 없습니다</div>
+            )}
+          </div>
         </div>
       )}
     </div>
