@@ -19,7 +19,6 @@ export class AdminGuard implements CanActivate {
       throw new ForbiddenException('인증이 필요합니다.');
     }
 
-    // DB에서 최신 role 확인
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { role: true },
