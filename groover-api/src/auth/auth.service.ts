@@ -120,16 +120,18 @@ export class AuthService {
 
   const tokens = await this.generateTokens(user.id, user.email);
 
-  return {
-    user: {
-      id: user.id,
-      userId: user.userId,
-      email: user.email,
-      name: user.name,
-      isVerified: user.isVerified,
-    },
-    ...tokens,
-  };
+  // login 메서드 내 user 반환 부분
+    return {
+      user: {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        name: user.name,
+        isVerified: user.isVerified,
+        role: user.role,  // 추가
+      },
+      ...tokens,
+    };
 }
 
   // ========================================
@@ -342,17 +344,18 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-    return this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        profileImageUrl: true,
-        isVerified: true,
-      },
-    });
-  }
+  return this.prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      profileImageUrl: true,
+      isVerified: true,
+      role: true,  // 추가
+    },
+  });
+}
 
   async cleanupExpiredTokens() {
     await this.prisma.refreshToken.deleteMany({
