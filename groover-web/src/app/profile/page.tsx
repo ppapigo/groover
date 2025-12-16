@@ -1,10 +1,10 @@
 // src/app/profile/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import {
   User,
@@ -22,20 +22,7 @@ import {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const { user, isLoading, logout } = useAuth();
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        const redirectUrl = encodeURIComponent(pathname);
-        router.push(`/login?redirect=${redirectUrl}`);
-      } else {
-        setChecked(true);
-      }
-    }
-  }, [isLoading, user, router, pathname]);
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -46,38 +33,21 @@ export default function ProfilePage() {
     }
   };
 
-  // 로딩 중이거나 아직 체크 안 됐으면 로딩 표시
-  if (isLoading || !checked) {
-    return (
-      <>
-        <AppHeader />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-          <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
   return (
-    <>
+    <AuthGuard>
       <AppHeader />
       <div style={{ padding: '16px', paddingBottom: '80px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#0f62fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
-            {user.profileImageUrl ? (
+            {user?.profileImageUrl ? (
               <img src={user.profileImageUrl} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <User size={28} />
             )}
           </div>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{user.name || '이름 없음'}</h2>
-            <p style={{ fontSize: '13px', color: '#666' }}>{user.email}</p>
+            <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{user?.name || '이름 없음'}</h2>
+            <p style={{ fontSize: '13px', color: '#666' }}>{user?.email}</p>
           </div>
           <Link href="/profile/edit" style={{ padding: '8px 12px', fontSize: '12px', border: '1px solid #ddd', borderRadius: '8px', color: '#666', textDecoration: 'none' }}>
             프로필 수정
@@ -167,6 +137,6 @@ export default function ProfilePage() {
 
         <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '11px', color: '#ccc' }}>Groover v1.0.0</p>
       </div>
-    </>
+    </AuthGuard>
   );
 }

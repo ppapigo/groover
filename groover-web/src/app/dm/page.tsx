@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 import DmMenu from '@/components/dm/DmMenu';
 import ReportModal from '@/components/dm/ReportModal';
 import { Plus, Search, X } from 'lucide-react';
@@ -130,7 +131,6 @@ export default function DmPage() {
   const [showReport, setShowReport] = useState(false);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   
-  // 새 대화 시작 관련
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
@@ -239,149 +239,148 @@ export default function DmPage() {
 
   const totalUnread = threads.reduce((sum, t) => sum + t.unreadCount, 0);
 
-  if (isLoading) {
-    return (
+  return (
+    <AuthGuard>
       <div className="min-h-screen bg-background">
         <AppHeader />
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      
-      <div className="bg-white border-b border-border">
-        <div className="px-5 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text-primary">메시지</h1>
-              {totalUnread > 0 && (
-                <span className="badge-error">{totalUnread}</span>
-              )}
-            </div>
-            
-            <button 
-              onClick={() => setShowNewChat(true)}
-              className="w-10 h-10 flex items-center justify-center text-white bg-primary hover:bg-primary-dark rounded-full transition-colors"
-            >
-              <Plus size={24} />
-            </button>
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        </div>
-      </div>
-
-      <div className="px-4 py-3 space-y-2">
-        {threads.length > 0 ? (
-          threads.map((thread, index) => (
-            <div 
-              key={thread.id}
-              className="animate-slide-up"
-              style={{ animationDelay: `${index * 0.05}s` }}
-            >
-              <ThreadCard thread={thread} onMenuOpen={handleMenuOpen} />
-            </div>
-          ))
         ) : (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="text-6xl mb-4">💬</div>
-            <p className="text-text-secondary mb-4">아직 메시지가 없습니다</p>
-            <button
-              onClick={() => setShowNewChat(true)}
-              className="px-6 py-3 bg-primary text-white rounded-full font-medium"
-            >
-              새 대화 시작하기
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 새 대화 시작 모달 */}
-      {showNewChat && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-bold">새 대화</h2>
-              <button 
-                onClick={() => {
-                  setShowNewChat(false);
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-                className="p-2"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="p-4">
-              <div className="relative">
-                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder="이름으로 검색..."
-                  className="w-full pl-12 pr-4 py-3 bg-card-soft rounded-full text-[15px] outline-none focus:ring-2 focus:ring-primary"
-                  autoFocus
-                />
+          <>
+            <div className="bg-white border-b border-border">
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-text-primary">메시지</h1>
+                    {totalUnread > 0 && (
+                      <span className="badge-error">{totalUnread}</span>
+                    )}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setShowNewChat(true)}
+                    className="w-10 h-10 flex items-center justify-center text-white bg-primary hover:bg-primary-dark rounded-full transition-colors"
+                  >
+                    <Plus size={24} />
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-              {isSearching ? (
-                <div className="text-center py-8 text-text-secondary">검색 중...</div>
-              ) : searchResults.length > 0 ? (
-                <div className="space-y-2">
-                  {searchResults.map((user) => (
-                    <button
-                      key={user.id}
-                      onClick={() => handleStartChat(user.id)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-card-soft rounded-xl transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-card-soft flex items-center justify-center text-xl overflow-hidden">
-                        {user.profileImageUrl ? (
-                          <img src={user.profileImageUrl} alt={user.name} className="w-full h-full object-cover" />
-                        ) : (
-                          '👤'
-                        )}
-                      </div>
-                      <span className="font-medium">{user.name}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : searchQuery ? (
-                <div className="text-center py-8 text-text-secondary">검색 결과가 없습니다</div>
+            <div className="px-4 py-3 space-y-2 pb-24">
+              {threads.length > 0 ? (
+                threads.map((thread, index) => (
+                  <div 
+                    key={thread.id}
+                    className="animate-slide-up"
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    <ThreadCard thread={thread} onMenuOpen={handleMenuOpen} />
+                  </div>
+                ))
               ) : (
-                <div className="text-center py-8 text-text-secondary">사용자 이름을 검색하세요</div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="text-6xl mb-4">💬</div>
+                  <p className="text-text-secondary mb-4">아직 메시지가 없습니다</p>
+                  <button
+                    onClick={() => setShowNewChat(true)}
+                    className="px-6 py-3 bg-primary text-white rounded-full font-medium"
+                  >
+                    새 대화 시작하기
+                  </button>
+                </div>
               )}
             </div>
+          </>
+        )}
+
+        {/* 새 대화 시작 모달 */}
+        {showNewChat && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+            <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h2 className="text-lg font-bold">새 대화</h2>
+                <button 
+                  onClick={() => {
+                    setShowNewChat(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="p-2"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="p-4">
+                <div className="relative">
+                  <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="이름으로 검색..."
+                    className="w-full pl-12 pr-4 py-3 bg-card-soft rounded-full text-[15px] outline-none focus:ring-2 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 pb-4">
+                {isSearching ? (
+                  <div className="text-center py-8 text-text-secondary">검색 중...</div>
+                ) : searchResults.length > 0 ? (
+                  <div className="space-y-2">
+                    {searchResults.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleStartChat(user.id)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-card-soft rounded-xl transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-card-soft flex items-center justify-center text-xl overflow-hidden">
+                          {user.profileImageUrl ? (
+                            <img src={user.profileImageUrl} alt={user.name} className="w-full h-full object-cover" />
+                          ) : (
+                            '👤'
+                          )}
+                        </div>
+                        <span className="font-medium">{user.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : searchQuery ? (
+                  <div className="text-center py-8 text-text-secondary">검색 결과가 없습니다</div>
+                ) : (
+                  <div className="text-center py-8 text-text-secondary">사용자 이름을 검색하세요</div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showMenu && selectedThread && (
-        <DmMenu
-          isBlocked={selectedThread.isBlocked || false}
-          onBlock={handleBlock}
-          onUnblock={handleUnblock}
-          onReport={() => {
-            setShowMenu(false);
-            setShowReport(true);
-          }}
-          onClose={() => setShowMenu(false)}
+        {showMenu && selectedThread && (
+          <DmMenu
+            isBlocked={selectedThread.isBlocked || false}
+            onBlock={handleBlock}
+            onUnblock={handleUnblock}
+            onReport={() => {
+              setShowMenu(false);
+              setShowReport(true);
+            }}
+            onClose={() => setShowMenu(false)}
+          />
+        )}
+
+        <ReportModal
+          isOpen={showReport}
+          onClose={() => setShowReport(false)}
+          targetUser={selectedThread?.partner.name || ''}
+          onSubmit={handleReport}
         />
-      )}
-
-      <ReportModal
-        isOpen={showReport}
-        onClose={() => setShowReport(false)}
-        targetUser={selectedThread?.partner.name || ''}
-        onSubmit={handleReport}
-      />
-    </div>
+      </div>
+    </AuthGuard>
   );
 }
