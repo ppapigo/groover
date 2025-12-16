@@ -27,9 +27,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   const refreshUser = useCallback(async () => {
-    const token = getAccessToken();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
       try {
         const response = await api.get('/auth/me');
@@ -42,8 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // 이미 초기화되었으면 스킵
+    if (initialized) return;
+
     const initAuth = async () => {
-      const token = getAccessToken();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      
       if (token) {
         try {
           const response = await api.get('/auth/me');
@@ -54,9 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       setIsLoading(false);
+      setInitialized(true);
     };
+    
     initAuth();
-  }, []);
+  }, [initialized]);
 
   const login = useCallback(async (loginData: { email?: string; userId?: string; password: string }) => {
     const response = await api.post('/auth/login', loginData);
@@ -90,12 +97,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  // 토큰이 있으면 일단 인증된 것으로 간주 (로딩 중일 때)
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+  const isAuthenticated = !!user || (isLoading && hasToken);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated,
         login,
         register,
         logout,
