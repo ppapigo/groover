@@ -635,4 +635,145 @@ export class BlogService {
       this.logger.warn(`Failed to record post view: ${error}`);
     }
   }
+  // src/blog/blog.service.ts - 맨 아래에 추가
+
+  // ========================================
+  // 댓글
+  // ========================================
+
+  async getComments(postId: string) {
+    // postId가 UUID인지 slug인지 확인
+    let post;
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
+    
+    if (isUUID) {
+      post = await this.prisma.post.findUnique({ where: { id: postId } });
+    } else {
+      post = await this.prisma.post.findUnique({ where: { slug: postId } });
+    }
+    
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
+
+    const comments = await this.prisma.comment.findMany({
+      where: {
+        postId: post.id,
+        parentId: null, // 최상위 댓글만
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            profileImageUrl: true,
+          },
+        },
+        replies: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profileImageUrl: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return comments;
+  }
+
+  async createComment(
+    postId: string,
+    userId: string,
+    content: string,
+    parentId?: string,
+  ) {
+    // postId가 UUID인지 slug인지 확인
+    let post;
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
+    
+    if (isUUID) {
+      post = await this.prisma.post.findUnique({ where: { id: postId } });
+    } else {
+      post = await this.prisma.post.findUnique({ where: { slug: postId } });
+    }
+    
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
+
+    const comment = await this.prisma.comment.create({
+      data: {
+        postId: post.id,
+        userId,
+        content,
+        parentId: parentId || null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            profileImageUrl: true,
+          },
+        },
+      },
+    });
+
+    // 댓글 수 증가
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: { commentCount: { increment: 1 } },
+    });
+
+    return comment;
+  }
+
+  async deleteComment(commentId: string, userId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    }
+
+    if (comment.userId !== userId) {
+      throw new ForbiddenException('삭제 권한이 없습니다.');
+    }
+
+    await this.prisma.comment.delete({
+      where: { id: commentId },
+    });
+
+    // 댓글 수 감소
+    await this.prisma.post.update({
+      where: { id: comment.postId },
+      data: { commentCount: { decrement: 1 } },
+    });
+  }
+
+  async likeComment(commentId: string, userId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    }
+
+    // 좋아요 수 증가 (간단 버전 - 중복 체크 없음)
+    await this.prisma.comment.update({
+      where: { id: commentId },
+      data: { likeCount: { increment: 1 } },
+    });
+
+    return { liked: true, likeCount: comment.likeCount + 1 };
+  }
 }

@@ -288,4 +288,76 @@ export class BlogController {
       data: stats,
     };
   }
+  // src/blog/blog.controller.ts - 맨 아래에 추가
+
+  // ========================================
+  // 댓글
+  // ========================================
+
+  /**
+   * 댓글 목록 조회
+   * GET /v1/blog/posts/:id/comments
+   */
+  @Get('posts/:id/comments')
+  async getComments(@Param('id') id: string) {
+    const comments = await this.blogService.getComments(id);
+    return {
+      success: true,
+      data: comments,
+    };
+  }
+
+  /**
+   * 댓글 작성
+   * POST /v1/blog/posts/:id/comments
+   */
+  @Post('posts/:id/comments')
+  @UseGuards(JwtAuthGuard)
+  async createComment(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() body: { content: string; parentId?: string },
+  ) {
+    const comment = await this.blogService.createComment(
+      id,
+      req.user.id,
+      body.content,
+      body.parentId,
+    );
+    return {
+      success: true,
+      data: comment,
+    };
+  }
+
+  /**
+   * 댓글 삭제
+   * DELETE /v1/blog/comments/:id
+   */
+  @Delete('comments/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteComment(
+    @Request() req,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.blogService.deleteComment(id, req.user.id);
+  }
+
+  /**
+   * 댓글 좋아요
+   * POST /v1/blog/comments/:id/like
+   */
+  @Post('comments/:id/like')
+  @UseGuards(JwtAuthGuard)
+  async likeComment(
+    @Request() req,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const result = await this.blogService.likeComment(id, req.user.id);
+    return {
+      success: true,
+      data: result,
+    };
+  }
 }
