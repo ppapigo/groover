@@ -32,7 +32,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
       // 유저의 글 목록 가져오기
       try {
-        const postsRes = await api.get(`/blog/posts?userId=${params.id}`);
+        const postsRes = await api.get(`/blog/users/${params.id}/posts`);
         const postsData = postsRes.data.data?.items || postsRes.data.items || postsRes.data || [];
         setPosts(Array.isArray(postsData) ? postsData : []);
       } catch {

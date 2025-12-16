@@ -1,10 +1,10 @@
 // src/types/index.ts
-
 export interface User {
   id: string;
   name: string;
   email?: string;
   profileImageUrl?: string;
+  role?: 'USER' | 'CREATOR' | 'ADVERTISER' | 'ADMIN' | 'SUPER_ADMIN';
 }
 
 export interface PostMetadata {
