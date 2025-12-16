@@ -116,6 +116,21 @@ export default function ProfilePage() {
             <span style={{ flex: 1, fontSize: '14px' }}>설정</span>
             <ChevronRight size={18} color="#ccc" />
           </Link>
+          // src/app/profile/page.tsx - 설정 섹션 아래에 추가
+
+          {/* 관리자 메뉴 (ADMIN, SUPER_ADMIN만 표시) */}
+            {user?.role && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
+              <>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginBottom: '10px', marginTop: '20px' }}>관리자</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                  <Link href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+                    <Settings size={20} color="#ff4444" />
+                    <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: '#ff4444' }}>관리자 페이지</span>
+                    <ChevronRight size={18} color="#ccc" />
+                  </Link>
+                </div>
+              </>
+            )}
           <Link href="/help" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <HelpCircle size={20} color="#666" />
             <span style={{ flex: 1, fontSize: '14px' }}>고객센터</span>

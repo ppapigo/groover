@@ -1,6 +1,5 @@
 // src/contexts/AuthContext.tsx
 'use client';
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api, { setAccessToken, getAccessToken } from '@/lib/api';
 
@@ -9,6 +8,7 @@ interface User {
   email: string;
   name: string;
   profileImageUrl?: string;
+  role?: 'USER' | 'CREATOR' | 'ADVERTISER' | 'ADMIN' | 'SUPER_ADMIN';
 }
 
 interface AuthContextType {
@@ -28,7 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 유저 정보 새로고침
   const refreshUser = useCallback(async () => {
     const token = getAccessToken();
     if (token) {
@@ -42,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // 초기 로드 - 저장된 토큰으로 유저 정보 가져오기
   useEffect(() => {
     const initAuth = async () => {
       const token = getAccessToken();
@@ -51,18 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const response = await api.get('/auth/me');
           setUser(response.data.data);
         } catch (error) {
-          // 토큰 만료 시 자동으로 갱신 시도 (인터셉터에서 처리)
           setAccessToken(null);
           setUser(null);
         }
       }
       setIsLoading(false);
     };
-
     initAuth();
   }, []);
 
-  // 로그인
   const login = useCallback(async (loginData: { email?: string; userId?: string; password: string }) => {
     const response = await api.post('/auth/login', loginData);
     const { user, accessToken } = response.data.data;
@@ -70,13 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(user);
   }, []);
 
-  // 회원가입
   const register = useCallback(async (email: string, password: string, name: string) => {
     const response = await api.post('/auth/register', { email, password, name });
     return response.data;
   }, []);
 
-  // 로그아웃
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -87,7 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
-  // 모든 기기에서 로그아웃
   const logoutAll = useCallback(async () => {
     try {
       await api.post('/auth/logout-all');
