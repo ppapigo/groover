@@ -18,7 +18,6 @@ interface FeedTag {
   iconEmoji?: string;
 }
 
-// 썸네일 이미지 추출 함수
 function extractThumbnail(content: string, previewImage?: string): string | null {
   if (previewImage) return previewImage;
   if (!content) return null;
@@ -27,25 +26,13 @@ function extractThumbnail(content: string, previewImage?: string): string | null
   return match ? match[1] : null;
 }
 
-// 텍스트에서 마크다운/URL 제거
 function cleanPreviewText(text: string): string {
   if (!text) return '';
-  
   let cleaned = text;
-  
-  // 마크다운 이미지 제거 ![...](url)
   cleaned = cleaned.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-  
-  // HTML 이미지 태그 제거
   cleaned = cleaned.replace(/<img[^>]*>/gi, '');
-  
-  // 마크다운 링크를 텍스트로 변환 [text](url) -> text
   cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  
-  // URL 제거
   cleaned = cleaned.replace(/https?:\/\/[^\s)]+/g, '');
-  
-  // 마크다운 문법 제거
   cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');
   cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
@@ -56,14 +43,10 @@ function cleanPreviewText(text: string): string {
   cleaned = cleaned.replace(/^>\s*/gm, '');
   cleaned = cleaned.replace(/^[-*+]\s+/gm, '');
   cleaned = cleaned.replace(/^\d+\.\s+/gm, '');
-  
-  // 공백 정리
   cleaned = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
-  
   return cleaned;
 }
 
-// 구매 상태 색상
 function getStatusStyle(status: string) {
   switch (status) {
     case '구매함': return { bg: '#e8f5e9', color: '#2e7d32' };
@@ -115,8 +98,8 @@ function BlogContent() {
           setPopularTags(popularData.data);
         }
 
-        if (user) {
-          const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('accessToken');
+        if (token) {
           const pinnedRes = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/tags/pinned`,
             { headers: { Authorization: `Bearer ${token}` } }
@@ -163,7 +146,9 @@ function BlogContent() {
   };
 
   const handlePinTag = async (tag: FeedTag) => {
-    if (!user) {
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+    
+    if (!user && !hasToken) {
       if (confirm('태그를 핀하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/blog');
       }
@@ -198,8 +183,8 @@ function BlogContent() {
     newPinnedTags.splice(toIndex, 0, movedTag);
     setPinnedTags(newPinnedTags);
 
-    if (user) {
-      const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('accessToken');
+    if (token) {
       try {
         await fetch(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1'}/tags/pinned/reorder`,
@@ -220,7 +205,9 @@ function BlogContent() {
 
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) {
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+    
+    if (!user && !hasToken) {
       if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/write');
       }
@@ -273,7 +260,9 @@ function BlogContent() {
     e.stopPropagation();
     setOpenMenuId(null);
     
-    if (!user) {
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+    
+    if (!user && !hasToken) {
       if (confirm('신고하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/blog');
       }
@@ -353,6 +342,8 @@ function BlogContent() {
         style={{ 
           overflowY: 'auto',
           position: 'relative',
+          padding: '0 16px',
+          paddingBottom: '100px',
         }}
       >
         {/* Pull to refresh */}
@@ -382,7 +373,7 @@ function BlogContent() {
                   width: '24px',
                   height: '24px',
                   border: '2px solid #ddd',
-                  borderTopColor: pullDistance >= PULL_THRESHOLD ? 'var(--primary)' : '#ddd',
+                  borderTopColor: pullDistance >= PULL_THRESHOLD ? '#0f62fe' : '#ddd',
                   borderRadius: '50%',
                   animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
                   transform: `rotate(${pullDistance * 2}deg)`,
@@ -401,8 +392,8 @@ function BlogContent() {
         </div>
 
         {/* 헤더 */}
-        <div className="blog-header">
-          <h2>오늘의 쇼핑 리뷰</h2>
+        <div style={{ padding: '16px 0', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700' }}>오늘의 쇼핑 리뷰</h2>
         </div>
 
         {/* 태그 관리 패널 */}
@@ -649,7 +640,7 @@ function BlogContent() {
         )}
 
         {error && (
-          <div className="error-message">
+          <div style={{ padding: '20px', textAlign: 'center', color: '#ff4444' }}>
             {error}
           </div>
         )}
@@ -659,13 +650,9 @@ function BlogContent() {
           {(posts || []).map((post) => {
             const thumbnail = extractThumbnail(post.content, post.previewImage);
             const isAuthor = user && post.author?.id === user.id;
-            
-            // 메타데이터에서 핵심 요약 가져오기
             const metadata = post.metadata || {};
             const summary = metadata.summary || '';
             const purchaseStatus = metadata.purchaseStatus || '';
-            
-            // 미리보기 텍스트 결정 (마크다운/URL 제거)
             const rawPreview = summary || post.excerpt || post.content || '';
             const previewText = summary ? summary : cleanPreviewText(rawPreview).slice(0, 80);
             
@@ -677,13 +664,11 @@ function BlogContent() {
                   borderBottom: '1px solid #f0f0f0',
                 }}
               >
-                {/* 상단: 썸네일 + 제목 + 메뉴 */}
                 <div style={{ 
                   display: 'flex',
                   gap: '12px',
                   marginBottom: '10px',
                 }}>
-                  {/* 썸네일 */}
                   {thumbnail && (
                     <Link href={`/blog/${post.slug}`} style={{ flexShrink: 0 }}>
                       <div style={{
@@ -703,7 +688,6 @@ function BlogContent() {
                             objectFit: 'cover',
                           }}
                         />
-                        {/* 구매 상태 배지 */}
                         {purchaseStatus && (
                           <span style={{
                             position: 'absolute',
@@ -723,7 +707,6 @@ function BlogContent() {
                     </Link>
                   )}
                   
-                  {/* 제목 + 요약 */}
                   <Link 
                     href={`/blog/${post.slug}`}
                     style={{ 
@@ -733,7 +716,6 @@ function BlogContent() {
                       color: 'inherit',
                     }}
                   >
-                    {/* 구매상태 (이미지 없을 때) */}
                     {!thumbnail && purchaseStatus && (
                       <span style={{
                         display: 'inline-block',
@@ -762,7 +744,6 @@ function BlogContent() {
                       {post.title}
                     </h3>
                     
-                    {/* 미리보기 텍스트 */}
                     {previewText && (
                       <p style={{
                         fontSize: '14px',
@@ -777,7 +758,6 @@ function BlogContent() {
                     )}
                   </Link>
                   
-                  {/* 더보기 메뉴 */}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <button
                       onClick={(e) => handleMenuToggle(e, post.slug)}
@@ -876,7 +856,6 @@ function BlogContent() {
                   </div>
                 </div>
                 
-                {/* 하단: 메타 정보 - 우측 정렬 */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -926,24 +905,42 @@ function BlogContent() {
           })}
 
           {isLoading && (
-            <div className="loading">
-              <div className="loading-spinner"></div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                border: '3px solid #f0f0f0',
+                borderTopColor: '#0f62fe',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }} />
             </div>
           )}
 
           {!hasMore && (posts || []).length > 0 && (
-            <div className="end-message">
+            <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '14px' }}>
               모든 글을 불러왔습니다
             </div>
           )}
 
           {!isLoading && (posts || []).length === 0 && !error && (
-            <div className="empty-state">
-              <div className="empty-icon">📝</div>
-              <p className="empty-text">
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+              <p style={{ color: '#666', marginBottom: '16px' }}>
                 {activeTag ? `#${activeTag} 태그의 글이 없습니다` : '아직 글이 없습니다'}
               </p>
-              <button onClick={handleWriteClick} className="empty-btn">
+              <button 
+                onClick={handleWriteClick} 
+                style={{
+                  padding: '12px 24px',
+                  background: '#0f62fe',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
                 첫 번째 글 작성하기
               </button>
             </div>
