@@ -236,8 +236,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
                     {renderMessage(msg)}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMyMessage(msg) ? 'flex-end' : 'flex-start', gap: 2 }}>
+                    {isMyMessage(msg) && !msg.isRead && (
+                      <span style={{ fontSize: 11, color: '#facc15', fontWeight: 600 }}>1</span>
+                    )}
                     <span style={{ fontSize: 11, color: '#999' }}>{formatTime(msg.createdAt)}</span>
-                    {isMyMessage(msg) && msg.isRead && <span style={{ fontSize: 10, color: '#22c55e' }}>읽음</span>}
                   </div>
                 </div>
               </div>
