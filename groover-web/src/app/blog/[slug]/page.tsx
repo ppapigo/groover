@@ -130,7 +130,6 @@ function DetailSkeleton() {
   );
 }
 
-// 댓글 컴포넌트
 function CommentItem({ 
   comment, 
   user, 
@@ -155,7 +154,6 @@ function CommentItem({
   return (
     <div style={{ marginLeft: depth > 0 ? 32 : 0, marginBottom: 16 }}>
       <div style={{ display: 'flex', gap: 12 }}>
-        {/* 프로필 이미지 */}
         <div style={{
           width: 36,
           height: 36,
@@ -174,7 +172,6 @@ function CommentItem({
           )}
         </div>
 
-        {/* 댓글 내용 */}
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>{comment.user.name}</span>
@@ -185,7 +182,6 @@ function CommentItem({
             {comment.content}
           </p>
 
-          {/* 액션 버튼들 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
               onClick={() => {
@@ -220,7 +216,6 @@ function CommentItem({
               답글
             </button>
 
-            {/* 더보기 메뉴 */}
             <div style={{ position: 'relative', marginLeft: 'auto' }}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
@@ -299,7 +294,6 @@ function CommentItem({
         </div>
       </div>
 
-      {/* 답글들 */}
       {comment.replies && comment.replies.length > 0 && (
         <div style={{ marginTop: 12 }}>
           {comment.replies.map(reply => (
@@ -551,7 +545,7 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
   const hasContentImages = post.content.includes('![');
 
   return (
-    <div className="min-h-screen bg-white pb-32">
+    <div className="min-h-screen bg-white" style={{ paddingBottom: 140 }}>
       {/* 헤더 */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center justify-between h-14 px-4">
@@ -686,7 +680,6 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
             댓글 {post.commentCount || 0}
           </h3>
 
-          {/* 댓글 목록 */}
           {comments.length === 0 ? (
             <p style={{ color: '#999', textAlign: 'center', padding: '24px 0' }}>
               첫 댓글을 남겨보세요!
@@ -710,13 +703,12 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
       {/* 하단 댓글 입력창 */}
       <div style={{
         position: 'fixed',
-        bottom: 0,
+        bottom: 64,
         left: 0,
         right: 0,
         background: '#fff',
         borderTop: '1px solid #eee',
         padding: '12px 16px',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
         zIndex: 30,
       }}>
         {replyTo && (
