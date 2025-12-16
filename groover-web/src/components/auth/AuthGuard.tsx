@@ -27,13 +27,15 @@ export function AuthGuard({ children, fallback }: AuthGuardProps) {
       // 유저도 없고 토큰도 없으면 로그인으로
       const redirectUrl = encodeURIComponent(pathname);
       router.push(`/login?redirect=${redirectUrl}`);
-    } else {
+    } else if (user) {
+      // user가 로드되면 checked
       setChecked(true);
     }
+    // 토큰은 있지만 user가 아직 없으면 계속 대기
   }, [isLoading, user, router, pathname]);
 
-  // 로딩 중이거나 체크 안 됐으면 로딩 표시
-  if (isLoading || !checked) {
+  // 로딩 중이거나 user가 아직 없으면 로딩 표시
+  if (isLoading || !user) {
     return fallback || (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
