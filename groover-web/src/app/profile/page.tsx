@@ -1,8 +1,9 @@
 // src/app/profile/page.tsx
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -21,7 +22,20 @@ import {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isLoading, logout } = useAuth();
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        const redirectUrl = encodeURIComponent(pathname);
+        router.push(`/login?redirect=${redirectUrl}`);
+      } else {
+        setChecked(true);
+      }
+    }
+  }, [isLoading, user, router, pathname]);
 
   const handleLogout = async () => {
     try {
@@ -32,17 +46,20 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) {
+  // 로딩 중이거나 아직 체크 안 됐으면 로딩 표시
+  if (isLoading || !checked) {
     return (
       <>
         <AppHeader />
-        <div style={{ padding: '40px', textAlign: 'center' }}>로딩 중...</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
       </>
     );
   }
 
   if (!user) {
-    router.push('/login');
     return null;
   }
 
