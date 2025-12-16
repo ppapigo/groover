@@ -1,7 +1,7 @@
 // src/components/auth/AuthGuard.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,19 +14,26 @@ export function AuthGuard({ children, fallback }: AuthGuardProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      // 현재 경로를 redirect 파라미터로 전달
-      const redirectUrl = encodeURIComponent(pathname);
-      router.push(`/login?redirect=${redirectUrl}`);
+    // 로딩이 완료된 후에만 체크
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        const redirectUrl = encodeURIComponent(pathname);
+        router.push(`/login?redirect=${redirectUrl}`);
+      } else {
+        setChecked(true);
+      }
     }
   }, [isLoading, isAuthenticated, router, pathname]);
 
-  if (isLoading) {
+  // 로딩 중이거나 아직 체크 안 됐으면 로딩 표시
+  if (isLoading || (!checked && !isAuthenticated)) {
     return fallback || (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
