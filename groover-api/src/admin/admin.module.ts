@@ -1,16 +1,33 @@
-// src/admin/admin.module.ts
+// src/admin/guards/admin.guard.ts
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AdminController } from './admin.controller';
-import { AdminService } from './admin.service';
-import { AdminGuard } from './guards/admin.guard';
-import { PrismaModule } from '../prisma/prisma.module';
+@Injectable()
+export class AdminGuard implements CanActivate {
+  constructor(private readonly prisma: PrismaService) {}
 
-@Module({
-  imports: [PrismaModule, ConfigModule],
-  controllers: [AdminController],
-  providers: [AdminService, AdminGuard],
-  exports: [AdminService],
-})
-export class AdminModule {}
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    if (!user) {
+      throw new ForbiddenException('인증이 필요합니다.');
+    }
+
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true },
+    });
+
+    if (!dbUser || (dbUser.role !== 'ADMIN' && dbUser.role !== 'SUPER_ADMIN')) {
+      throw new ForbiddenException('관리자 권한이 필요합니다.');
+    }
+
+    return true;
+  }
+}
