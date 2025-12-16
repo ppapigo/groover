@@ -83,19 +83,19 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
     const fetchData = async () => {
       try {
         // 현재 사용자 정보
-        const userRes = await fetch('/api/auth/me');
+        const userRes = await fetch('/api/v1/auth/me');
         const userData = await userRes.json();
-        setCurrentUserId(userData.id);
+        setCurrentUserId(userData.data?.id || userData.id);
 
         // 스레드 정보
-        const threadRes = await fetch(`/api/dm/threads/${params.id}`);
+        const threadRes = await fetch(`/api/v1/dm/threads/${params.id}`);
         const threadData = await threadRes.json();
-        setPartner(threadData.partner);
+        setPartner(threadData.data?.partner);
 
         // 메시지 목록
-        const messagesRes = await fetch(`/api/dm/threads/${params.id}/messages`);
+        const messagesRes = await fetch(`/api/v1/dm/threads/${params.id}/messages`);
         const messagesData = await messagesRes.json();
-        setMessages(messagesData.items || []);
+        setMessages(messagesData.data?.items || []);
       } catch (error) {
         console.error('Failed to fetch DM data:', error);
       } finally {
@@ -116,10 +116,7 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
       threadId: params.id,
-      sender: {
-        id: currentUserId,
-        name: '',
-      },
+      sender: { id: currentUserId, name: '' },
       content: input.trim(),
       messageType: 'TEXT',
       isRead: false,
@@ -127,44 +124,75 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
     };
 
     setMessages(prev => [...prev, tempMessage]);
+    const messageContent = input.trim();
     setInput('');
     inputRef.current?.focus();
 
     try {
-      const res = await fetch(`/api/dm/threads/${params.id}/messages`, {
+      const res = await fetch(`/api/v1/dm/threads/${params.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: input.trim() }),
+        body: JSON.stringify({ content: messageContent }),
       });
-      const newMessage = await res.json();
+      const result = await res.json();
       
-      // 임시 메시지를 실제 메시지로 교체
       setMessages(prev => 
-        prev.map(msg => msg.id === tempMessage.id ? newMessage : msg)
+        prev.map(msg => msg.id === tempMessage.id ? result.data : msg)
       );
     } catch (error) {
       console.error('Failed to send message:', error);
-      // 실패 시 임시 메시지 제거
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
     }
   };
 
-  const handleBlock = () => {
-    setIsBlocked(true);
-    setShowMenu(false);
-    alert(`${partner?.name}님을 차단했습니다.`);
+  const handleBlock = async () => {
+    if (!partner) return;
+    
+    try {
+      await fetch('/api/v1/dm/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: partner.id }),
+      });
+      setIsBlocked(true);
+      setShowMenu(false);
+      alert(`${partner.name}님을 차단했습니다.`);
+    } catch (error) {
+      console.error('Failed to block:', error);
+    }
   };
 
-  const handleUnblock = () => {
-    setIsBlocked(false);
-    setShowMenu(false);
-    alert(`${partner?.name}님의 차단을 해제했습니다.`);
+  const handleUnblock = async () => {
+    if (!partner) return;
+    
+    try {
+      await fetch('/api/v1/dm/unblock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: partner.id }),
+      });
+      setIsBlocked(false);
+      setShowMenu(false);
+      alert(`${partner.name}님의 차단을 해제했습니다.`);
+    } catch (error) {
+      console.error('Failed to unblock:', error);
+    }
   };
 
-  const handleReport = (type: string, description: string) => {
-    console.log('Report:', { targetUser: partner?.name, type, description });
-    setShowReport(false);
-    alert('신고가 접수되었습니다.');
+  const handleReport = async (type: string, description: string) => {
+    if (!partner) return;
+    
+    try {
+      await fetch('/api/v1/dm/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: partner.id, type, description }),
+      });
+      setShowReport(false);
+      alert('신고가 접수되었습니다.');
+    } catch (error) {
+      console.error('Failed to report:', error);
+    }
   };
 
   if (isLoading) {
@@ -177,7 +205,6 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* 헤더 */}
       <header className="flex-shrink-0 bg-white border-b border-border safe-area-pt">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
@@ -214,7 +241,6 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         </div>
       </header>
 
-      {/* 메시지 영역 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length > 0 && (
           <div className="flex items-center justify-center my-4">
@@ -230,13 +256,10 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 입력 영역 */}
       {isBlocked ? (
         <div className="flex-shrink-0 bg-card-soft border-t border-border px-5 py-4 safe-area-pb">
           <div className="text-center">
-            <p className="text-sm text-text-secondary mb-3">
-              이 사용자를 차단했습니다
-            </p>
+            <p className="text-sm text-text-secondary mb-3">이 사용자를 차단했습니다</p>
             <button onClick={handleUnblock} className="btn-secondary text-sm">
               차단 해제
             </button>
@@ -278,7 +301,6 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* 메뉴 모달 */}
       {showMenu && (
         <DmMenu
           isBlocked={isBlocked}
@@ -292,7 +314,6 @@ export default function DmChatPage({ params }: { params: { id: string } }) {
         />
       )}
 
-      {/* 신고 모달 */}
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}

@@ -58,7 +58,6 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
         href={thread.isBlocked ? '#' : `/dm/${thread.id}`}
         className="flex items-center gap-3 flex-1 min-w-0"
       >
-        {/* 프로필 이미지 */}
         <div className="relative w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl bg-card-soft overflow-hidden">
           {thread.partner.profileImageUrl ? (
             <img 
@@ -70,7 +69,6 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
             '👤'
           )}
           
-          {/* 읽지 않은 메시지 뱃지 */}
           {thread.unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1.5 bg-error text-white text-xs font-bold rounded-full flex items-center justify-center">
               {thread.unreadCount > 99 ? '99+' : thread.unreadCount}
@@ -78,7 +76,6 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
           )}
         </div>
 
-        {/* 내용 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-text-primary truncate">
@@ -102,7 +99,6 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
         </div>
       </Link>
 
-      {/* 메뉴 버튼 */}
       <button
         onClick={(e) => onMenuOpen(thread, e)}
         className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-text-tertiary hover:bg-card-soft rounded-full transition-colors"
@@ -127,9 +123,9 @@ export default function DmPage() {
   useEffect(() => {
     const fetchThreads = async () => {
       try {
-        const res = await fetch('/api/dm/threads');
+        const res = await fetch('/api/v1/dm/threads');
         const data = await res.json();
-        setThreads(data.items || []);
+        setThreads(data.data?.items || []);
       } catch (error) {
         console.error('Failed to fetch threads:', error);
       } finally {
@@ -147,30 +143,66 @@ export default function DmPage() {
     setShowMenu(true);
   };
 
-  const handleBlock = () => {
+  const handleBlock = async () => {
     if (!selectedThread) return;
-    setThreads(threads.map(t =>
-      t.id === selectedThread.id ? { ...t, isBlocked: true } : t
-    ));
-    setShowMenu(false);
-    alert(`${selectedThread.partner.name}님을 차단했습니다.`);
+    
+    try {
+      await fetch('/api/v1/dm/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: selectedThread.partner.id }),
+      });
+      
+      setThreads(threads.map(t =>
+        t.id === selectedThread.id ? { ...t, isBlocked: true } : t
+      ));
+      setShowMenu(false);
+      alert(`${selectedThread.partner.name}님을 차단했습니다.`);
+    } catch (error) {
+      console.error('Failed to block user:', error);
+    }
   };
 
-  const handleUnblock = () => {
+  const handleUnblock = async () => {
     if (!selectedThread) return;
-    setThreads(threads.map(t =>
-      t.id === selectedThread.id ? { ...t, isBlocked: false } : t
-    ));
-    setShowMenu(false);
-    alert(`${selectedThread.partner.name}님의 차단을 해제했습니다.`);
+    
+    try {
+      await fetch('/api/v1/dm/unblock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: selectedThread.partner.id }),
+      });
+      
+      setThreads(threads.map(t =>
+        t.id === selectedThread.id ? { ...t, isBlocked: false } : t
+      ));
+      setShowMenu(false);
+      alert(`${selectedThread.partner.name}님의 차단을 해제했습니다.`);
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+    }
   };
 
-  const handleReport = (type: string, description: string) => {
+  const handleReport = async (type: string, description: string) => {
     if (!selectedThread) return;
-    console.log('Report:', { targetUser: selectedThread.partner.name, type, description });
-    setShowReport(false);
-    setShowMenu(false);
-    alert('신고가 접수되었습니다. 검토 후 조치하겠습니다.');
+    
+    try {
+      await fetch('/api/v1/dm/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: selectedThread.partner.id,
+          type,
+          description,
+        }),
+      });
+      
+      setShowReport(false);
+      setShowMenu(false);
+      alert('신고가 접수되었습니다.');
+    } catch (error) {
+      console.error('Failed to report:', error);
+    }
   };
 
   const totalUnread = threads.reduce((sum, t) => sum + t.unreadCount, 0);
@@ -190,7 +222,6 @@ export default function DmPage() {
     <div className="min-h-screen bg-background">
       <AppHeader />
       
-      {/* 페이지 헤더 */}
       <div className="bg-white border-b border-border">
         <div className="px-5 py-4">
           <div className="flex items-center justify-between">
@@ -210,7 +241,6 @@ export default function DmPage() {
         </div>
       </div>
 
-      {/* 스레드 리스트 */}
       <div className="px-4 py-3 space-y-2">
         {threads.length > 0 ? (
           threads.map((thread, index) => (
@@ -232,7 +262,6 @@ export default function DmPage() {
         )}
       </div>
 
-      {/* 메뉴 모달 */}
       {showMenu && selectedThread && (
         <DmMenu
           isBlocked={selectedThread.isBlocked || false}
@@ -246,7 +275,6 @@ export default function DmPage() {
         />
       )}
 
-      {/* 신고 모달 */}
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}
