@@ -1,3 +1,4 @@
+// src/app/messages/[id]/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,13 +9,19 @@ import { useSocket } from '@/hooks/useSocket';
 import api from '@/lib/api';
 import imageCompression from 'browser-image-compression';
 
+interface Sender {
+  id: string;
+  name: string;
+  profileImageUrl?: string | null;
+}
+
 interface Message {
   id: string;
   content: string;
-  senderId: string;
+  sender: Sender;
   createdAt: string;
   isRead: boolean;
-  type?: 'text' | 'image' | 'ad_proposal';
+  messageType?: string;
   metadata?: any;
 }
 
@@ -51,7 +58,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     const unsubMessage = on('new_message', (data: any) => {
       if (data.threadId === params.id) {
         setMessages(prev => [...prev, data.message]);
-        if (data.message.senderId !== user?.id) {
+        if (data.message.sender?.id !== user?.id) {
           markAsRead(params.id);
         }
       }
@@ -81,27 +88,22 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
- const fetchConversation = async () => {
-  try {
-    const threadRes = await api.get('/dm/threads/' + params.id);
-    setParticipant(threadRes.data.data?.partner || threadRes.data.partner || threadRes.data);
+  const fetchConversation = async () => {
+    try {
+      const threadRes = await api.get('/dm/threads/' + params.id);
+      setParticipant(threadRes.data.data?.partner || threadRes.data.partner || threadRes.data);
 
-    const messagesRes = await api.get('/dm/threads/' + params.id + '/messages');
-    const messagesData = messagesRes.data.data?.items || messagesRes.data.items || messagesRes.data.data || messagesRes.data || [];
-    
-    // 디버깅용 로그
-    console.log('=== DM 디버그 ===');
-    console.log('현재 유저 ID:', user?.id);
-    console.log('메시지 데이터:', messagesData);
-    
-    setMessages(Array.isArray(messagesData) ? messagesData : []);
-    if (isConnected) markAsRead(params.id);
-  } catch (err) {
-    console.error('대화 불러오기 실패:', err);
-  } finally {
-    setIsLoading(false);
-  }
-};
+      const messagesRes = await api.get('/dm/threads/' + params.id + '/messages');
+      const messagesData = messagesRes.data.data?.items || messagesRes.data.items || messagesRes.data.data || messagesRes.data || [];
+      
+      setMessages(Array.isArray(messagesData) ? messagesData : []);
+      if (isConnected) markAsRead(params.id);
+    } catch (err) {
+      console.error('대화 불러오기 실패:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -158,11 +160,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       const uploadData = await uploadRes.json();
       const imageUrl = uploadData.data?.url || uploadData.url;
 
-      // 이미지 URL을 메시지로 전송
       const res = await api.post('/dm/threads/' + params.id + '/messages', { 
-      content: imageUrl,
-      messageType: 'image'
-    });
+        content: imageUrl,
+        messageType: 'image'
+      });
       setMessages(prev => [...prev, res.data.data || res.data]);
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
@@ -180,7 +181,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const formatTime = (d: string) => new Date(d).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
   const renderMessage = (msg: Message) => {
-    const isImage = msg.type === 'image' || msg.content.startsWith('https://') && (msg.content.includes('.jpg') || msg.content.includes('.png') || msg.content.includes('.jpeg') || msg.content.includes('s3.'));
+    const isImage = msg.messageType === 'image' || (msg.content.startsWith('https://') && (msg.content.includes('.jpg') || msg.content.includes('.png') || msg.content.includes('.jpeg') || msg.content.includes('s3.')));
     
     if (isImage) {
       return (
@@ -195,6 +196,8 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     
     return msg.content;
   };
+
+  const isMyMessage = (msg: Message) => msg.sender?.id === user?.id;
 
   return (
     <AuthGuard>
@@ -221,20 +224,20 @@ export default function ChatPage({ params }: { params: { id: string } }) {
             <div style={{ textAlign: 'center', color: '#999', marginTop: 40 }}>대화를 시작해보세요!</div>
           ) : (
             messages.map(msg => (
-              <div key={msg.id} style={{ display: 'flex', justifyContent: msg.senderId === user?.id ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                <div style={{ maxWidth: '70%', display: 'flex', flexDirection: msg.senderId === user?.id ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
+              <div key={msg.id} style={{ display: 'flex', justifyContent: isMyMessage(msg) ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+                <div style={{ maxWidth: '70%', display: 'flex', flexDirection: isMyMessage(msg) ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
                   <div style={{ 
                     padding: '10px 14px', 
-                    borderRadius: msg.senderId === user?.id ? '16px 16px 4px 16px' : '16px 16px 16px 4px', 
-                    background: msg.senderId === user?.id ? '#0f62fe' : '#fff', 
-                    color: msg.senderId === user?.id ? '#fff' : '#333', 
+                    borderRadius: isMyMessage(msg) ? '16px 16px 4px 16px' : '16px 16px 16px 4px', 
+                    background: isMyMessage(msg) ? '#0f62fe' : '#fff', 
+                    color: isMyMessage(msg) ? '#fff' : '#333', 
                     fontSize: 14 
                   }}>
                     {renderMessage(msg)}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: msg.senderId === user?.id ? 'flex-end' : 'flex-start', gap: 2 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMyMessage(msg) ? 'flex-end' : 'flex-start', gap: 2 }}>
                     <span style={{ fontSize: 11, color: '#999' }}>{formatTime(msg.createdAt)}</span>
-                    {msg.senderId === user?.id && msg.isRead && <span style={{ fontSize: 10, color: '#22c55e' }}>읽음</span>}
+                    {isMyMessage(msg) && msg.isRead && <span style={{ fontSize: 10, color: '#22c55e' }}>읽음</span>}
                   </div>
                 </div>
               </div>

@@ -102,7 +102,7 @@ export default function ProfilePage() {
 
         <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginBottom: '10px' }}>소통</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-          <Link href="/messages" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
+          <Link href="/dm" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', textDecoration: 'none', color: '#333' }}>
             <MessageCircle size={20} color="#666" />
             <span style={{ flex: 1, fontSize: '14px' }}>메시지</span>
             <ChevronRight size={18} color="#ccc" />
