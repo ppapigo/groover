@@ -1,66 +1,52 @@
 // src/app/dm/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
 import DmMenu from '@/components/dm/DmMenu';
 import ReportModal from '@/components/dm/ReportModal';
 
-interface Thread {
+interface Partner {
   id: string;
   name: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  isBlocked: boolean;
-  hasProposal?: boolean;
-  profileImage?: string;
+  profileImageUrl?: string;
 }
 
-const initialThreads: Thread[] = [
-  {
-    id: '1',
-    name: '뷰티브랜드A',
-    lastMessage: '안녕하세요! 제품 리뷰 협찬 제안 드립니다.',
-    time: '2시간 전',
-    unread: 2,
-    isBlocked: false,
-    hasProposal: true,
-  },
-  {
-    id: '2',
-    name: '캠핑러버',
-    lastMessage: '그 텐트 어디서 구매하셨어요?',
-    time: '어제',
-    unread: 0,
-    isBlocked: false,
-  },
-  {
-    id: '3',
-    name: '육아맘모임',
-    lastMessage: '정보 공유 감사합니다~',
-    time: '3일 전',
-    unread: 0,
-    isBlocked: false,
-  },
-  {
-    id: '4',
-    name: '스팸유저',
-    lastMessage: '광고입니다...',
-    time: '1주 전',
-    unread: 0,
-    isBlocked: true,
-  },
-];
+interface Thread {
+  id: string;
+  partner: Partner;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  isBlocked?: boolean;
+}
 
-// 메시지 스레드 카드
 interface ThreadCardProps {
   thread: Thread;
   onMenuOpen: (thread: Thread, e: React.MouseEvent) => void;
 }
 
 function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
+  const formatTime = (dateString: string) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return '어제';
+    } else if (diffDays < 7) {
+      return `${diffDays}일 전`;
+    } else {
+      return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+    }
+  };
+
   return (
     <div 
       className={`
@@ -73,26 +59,21 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
         className="flex items-center gap-3 flex-1 min-w-0"
       >
         {/* 프로필 이미지 */}
-        <div className={`
-          relative w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl
-          ${thread.hasProposal ? 'bg-primary-light' : 'bg-card-soft'}
-        `}>
-          {thread.profileImage ? (
+        <div className="relative w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl bg-card-soft overflow-hidden">
+          {thread.partner.profileImageUrl ? (
             <img 
-              src={thread.profileImage} 
-              alt={thread.name}
-              className="w-full h-full rounded-full object-cover"
+              src={thread.partner.profileImageUrl} 
+              alt={thread.partner.name}
+              className="w-full h-full object-cover"
             />
-          ) : thread.hasProposal ? (
-            '💼'
           ) : (
             '👤'
           )}
           
           {/* 읽지 않은 메시지 뱃지 */}
-          {thread.unread > 0 && (
+          {thread.unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[22px] h-[22px] px-1.5 bg-error text-white text-xs font-bold rounded-full flex items-center justify-center">
-              {thread.unread > 99 ? '99+' : thread.unread}
+              {thread.unreadCount > 99 ? '99+' : thread.unreadCount}
             </span>
           )}
         </div>
@@ -101,25 +82,20 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-text-primary truncate">
-              {thread.name}
+              {thread.partner.name}
             </span>
             {thread.isBlocked && (
               <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-text-tertiary bg-card-soft rounded">
                 차단됨
               </span>
             )}
-            {thread.hasProposal && !thread.isBlocked && (
-              <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-primary bg-primary-light rounded">
-                광고제안
-              </span>
-            )}
             <span className="flex-shrink-0 text-xs text-text-tertiary ml-auto">
-              {thread.time}
+              {formatTime(thread.lastMessageAt)}
             </span>
           </div>
           <p className={`
             text-sm truncate
-            ${thread.unread > 0 ? 'text-text-primary font-medium' : 'text-text-secondary'}
+            ${thread.unreadCount > 0 ? 'text-text-primary font-medium' : 'text-text-secondary'}
           `}>
             {thread.lastMessage}
           </p>
@@ -142,10 +118,27 @@ function ThreadCard({ thread, onMenuOpen }: ThreadCardProps) {
 }
 
 export default function DmPage() {
-  const [threads, setThreads] = useState(initialThreads);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
+
+  useEffect(() => {
+    const fetchThreads = async () => {
+      try {
+        const res = await fetch('/api/dm/threads');
+        const data = await res.json();
+        setThreads(data.items || []);
+      } catch (error) {
+        console.error('Failed to fetch threads:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchThreads();
+  }, []);
 
   const handleMenuOpen = (thread: Thread, e: React.MouseEvent) => {
     e.preventDefault();
@@ -160,8 +153,7 @@ export default function DmPage() {
       t.id === selectedThread.id ? { ...t, isBlocked: true } : t
     ));
     setShowMenu(false);
-    // 토스트 메시지로 변경하면 더 좋음
-    alert(`${selectedThread.name}님을 차단했습니다.`);
+    alert(`${selectedThread.partner.name}님을 차단했습니다.`);
   };
 
   const handleUnblock = () => {
@@ -170,19 +162,29 @@ export default function DmPage() {
       t.id === selectedThread.id ? { ...t, isBlocked: false } : t
     ));
     setShowMenu(false);
-    alert(`${selectedThread.name}님의 차단을 해제했습니다.`);
+    alert(`${selectedThread.partner.name}님의 차단을 해제했습니다.`);
   };
 
   const handleReport = (type: string, description: string) => {
     if (!selectedThread) return;
-    console.log('Report:', { targetUser: selectedThread.name, type, description });
+    console.log('Report:', { targetUser: selectedThread.partner.name, type, description });
     setShowReport(false);
     setShowMenu(false);
     alert('신고가 접수되었습니다. 검토 후 조치하겠습니다.');
   };
 
-  // 읽지 않은 메시지 총 개수
-  const totalUnread = threads.reduce((sum, t) => sum + t.unread, 0);
+  const totalUnread = threads.reduce((sum, t) => sum + t.unreadCount, 0);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -199,7 +201,6 @@ export default function DmPage() {
               )}
             </div>
             
-            {/* 검색 버튼 (선택적) */}
             <button className="w-10 h-10 flex items-center justify-center text-text-secondary hover:bg-card-soft rounded-full transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -234,7 +235,7 @@ export default function DmPage() {
       {/* 메뉴 모달 */}
       {showMenu && selectedThread && (
         <DmMenu
-          isBlocked={selectedThread.isBlocked}
+          isBlocked={selectedThread.isBlocked || false}
           onBlock={handleBlock}
           onUnblock={handleUnblock}
           onReport={() => {
@@ -249,7 +250,7 @@ export default function DmPage() {
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}
-        targetUser={selectedThread?.name || ''}
+        targetUser={selectedThread?.partner.name || ''}
         onSubmit={handleReport}
       />
     </div>
