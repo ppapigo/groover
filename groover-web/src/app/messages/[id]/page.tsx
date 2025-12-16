@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
 import api from '@/lib/api';
 import imageCompression from 'browser-image-compression';
+import { Image, Plus, ArrowLeft } from 'lucide-react';
 
 interface Sender {
   id: string;
@@ -170,12 +171,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       alert('이미지 업로드에 실패했습니다.');
     } finally {
       setIsSending(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-  };
-
-  const handleAdProposal = () => {
-    setShowAttachMenu(false);
-    router.push(`/deals/new?userId=${participant?.id}`);
   };
 
   const formatTime = (d: string) => new Date(d).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
@@ -204,10 +203,12 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f5f5f5' }}>
         {/* 헤더 */}
         <header style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>←</button>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <ArrowLeft size={24} />
+          </button>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, overflow: 'hidden' }}>
             {participant?.profileImageUrl ? (
-              <img src={participant.profileImageUrl} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              <img src={participant.profileImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : '👤'}
           </div>
           <div>
@@ -253,22 +254,17 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* 첨부 메뉴 */}
+        {/* 첨부 메뉴 - 사진만 */}
         {showAttachMenu && (
           <div style={{ padding: 16, background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: 24, justifyContent: 'center' }}>
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer' }}
             >
-              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#e8f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🖼️</div>
+              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#e8f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Image size={24} color="#0f62fe" />
+              </div>
               <span style={{ fontSize: 12, color: '#666' }}>사진</span>
-            </button>
-            <button
-              onClick={handleAdProposal}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#fff3e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📢</div>
-              <span style={{ fontSize: 12, color: '#666' }}>광고제안</span>
             </button>
           </div>
         )}
@@ -277,9 +273,20 @@ export default function ChatPage({ params }: { params: { id: string } }) {
         <div style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={() => setShowAttachMenu(!showAttachMenu)}
-            style={{ width: 40, height: 40, borderRadius: '50%', background: showAttachMenu ? '#0f62fe' : '#f5f5f5', color: showAttachMenu ? '#fff' : '#666', border: 'none', fontSize: 20, cursor: 'pointer' }}
+            style={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: '50%', 
+              background: showAttachMenu ? '#0f62fe' : '#f5f5f5', 
+              color: showAttachMenu ? '#fff' : '#666', 
+              border: 'none', 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            +
+            <Plus size={20} />
           </button>
           <input 
             value={input} 
