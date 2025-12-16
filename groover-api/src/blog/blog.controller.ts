@@ -377,4 +377,16 @@ async getUserPosts(
     data: result,
   };
 }
+/**
+ * 인기 태그 목록
+ * GET /v1/blog/tags/popular
+ */
+@Get('tags/popular')
+async getPopularTags(@Query('limit') limit?: string) {
+  const result = await this.blogService.getPopularTags(limit ? parseInt(limit) : 10);
+  return {
+    success: true,
+    data: result,
+  };
+}
 }

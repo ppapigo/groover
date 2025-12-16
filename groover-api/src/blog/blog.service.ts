@@ -120,6 +120,47 @@ export class BlogService {
     });
   }
 
+  async getPopularTags(limit: number = 10) {
+  // 방법 1: FeedTag 사용 (postCount 기준)
+  const feedTags = await this.prisma.feedTag.findMany({
+    where: {
+      isActive: true,
+      postCount: { gt: 0 },
+    },
+    orderBy: { postCount: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      postCount: true,
+    },
+  });
+
+  if (feedTags.length > 0) {
+    return feedTags;
+  }
+
+  // 방법 2: Post의 tags 필드에서 집계 (FeedTag가 없을 경우)
+  const posts = await this.prisma.post.findMany({
+    where: { status: 'PUBLISHED' },
+    select: { tags: true },
+  });
+
+  const tagCount: Record<string, number> = {};
+  posts.forEach(post => {
+    post.tags.forEach(tag => {
+      tagCount[tag] = (tagCount[tag] || 0) + 1;
+    });
+  });
+
+  const sortedTags = Object.entries(tagCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, postCount: count }));
+
+  return sortedTags;
+}
   // ========================================
   // 피드
   // ========================================
