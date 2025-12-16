@@ -106,31 +106,59 @@ export class AdminService {
     };
   }
 
-  async getUserDetail(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        warnings: { orderBy: { createdAt: 'desc' }, take: 10 },
-        posts: { orderBy: { createdAt: 'desc' }, take: 10 },
+ async getUserDetail(userId: string) {
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      warnings: { orderBy: { createdAt: 'desc' }, take: 10 },
+      posts: { 
+        where: { status: 'PUBLISHED' },
+        orderBy: { createdAt: 'desc' }, 
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          previewImage: true,
+          viewCount: true,
+          likeCount: true,
+          commentCount: true,
+          createdAt: true,
+          publishedAt: true,
+        }
       },
-    });
+      _count: {
+        select: {
+          posts: true,
+          followers: true,
+          following: true,
+        }
+      }
+    },
+  });
 
-    if (!user) {
-      throw new NotFoundException('유저를 찾을 수 없습니다.');
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      profileImageUrl: user.profileImageUrl,
-      warningCount: user.warningCount,
-      suspendedUntil: user.suspendedUntil,
-      createdAt: user.createdAt,
-      warnings: user.warnings,
-      recentPosts: user.posts,
-    };
+  if (!user) {
+    throw new NotFoundException('유저를 찾을 수 없습니다.');
   }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    profileImageUrl: user.profileImageUrl,
+    bio: user.bio,
+    role: user.role,
+    isVerified: user.isVerified,
+    warningCount: user.warningCount,
+    suspendedUntil: user.suspendedUntil,
+    createdAt: user.createdAt,
+    postCount: user._count.posts,
+    followers: user._count.followers,
+    following: user._count.following,
+    warnings: user.warnings,
+    recentPosts: user.posts,
+  };
+}
 
   async suspendUser(userId: string, days: number, reason: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
