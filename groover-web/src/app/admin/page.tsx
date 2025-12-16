@@ -5,8 +5,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { formatCurrency, formatRelativeTime } from '@/lib/utils';
+import api from '@/lib/api';
 
 // 관리자 API 타입
 interface PlatformStats {
@@ -26,11 +25,11 @@ interface UserItem {
   id: string;
   email: string;
   name: string | null;
+  profileImageUrl: string | null;
   warningCount: number;
-  adMatchingSuspended: boolean;
+  suspendedUntil: string | null;
   createdAt: string;
-  totalEarnings: number;
-  completedDeals: number;
+  postCount: number;
 }
 
 interface ReportItem {
@@ -43,17 +42,40 @@ interface ReportItem {
   messageContent?: string;
 }
 
+// 유틸 함수
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value || 0);
+}
+
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return '방금 전';
+  if (minutes < 60) return `${minutes}분 전`;
+  if (hours < 24) return `${hours}시간 전`;
+  if (days < 7) return `${days}일 전`;
+  return date.toLocaleDateString('ko-KR');
+}
+
 // 관리자 API
 const adminApi = {
-  getStats: () => api.get<PlatformStats>('/admin/stats'),
-  getUsers: (page: number = 1, search?: string) =>
-    api.get<{ items: UserItem[]; total: number; totalPages: number }>(
-      `/admin/users?page=${page}${search ? `&search=${search}` : ''}`
-    ),
-  getReports: (status?: string) =>
-    api.get<{ items: ReportItem[]; total: number }>(
-      `/admin/reports${status ? `?status=${status}` : ''}`
-    ),
+  getStats: async () => {
+    const res = await api.get('/admin/stats');
+    return res.data;
+  },
+  getUsers: async (page: number = 1, search?: string) => {
+    const res = await api.get(`/admin/users?page=${page}${search ? `&search=${search}` : ''}`);
+    return res.data;
+  },
+  getReports: async (status?: string) => {
+    const res = await api.get(`/admin/reports${status ? `?status=${status}` : ''}`);
+    return res.data;
+  },
   suspendUser: (userId: string, days: number, reason: string) =>
     api.post(`/admin/users/${userId}/suspend`, { days, reason }),
   warnUser: (userId: string, type: string, reason: string) =>
@@ -113,7 +135,7 @@ export default function AdminPage() {
       </header>
 
       {/* 콘텐츠 */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
         {tab === 'stats' && <StatsTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'reports' && <ReportsTab />}
@@ -145,10 +167,10 @@ function StatsTab() {
     <div className="space-y-6">
       {/* 주요 지표 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-       <StatCard label="총 유저" value={stats?.data?.totalUsers || 0} />
-        <StatCard label="이번 달 신규" value={stats?.data?.newUsersThisMonth || 0} color="blue" />
-          <StatCard label="총 거래" value={stats?.data?.totalDeals || 0} />
-        <StatCard label="진행 중" value={stats?.data?.activeDeals || 0} color="purple" />
+        <StatCard label="총 유저" value={stats?.totalUsers} />
+        <StatCard label="이번 달 신규" value={stats?.newUsersThisMonth} color="blue" />
+        <StatCard label="총 거래" value={stats?.totalDeals} />
+        <StatCard label="진행 중" value={stats?.activeDeals} color="purple" />
       </div>
 
       {/* 수익 */}
@@ -157,32 +179,32 @@ function StatsTab() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">총 거래액</p>
-            <p className="text-xl font-bold">{formatCurrency(stats?.data?.totalTransactionVolume || 0)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.totalTransactionVolume || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">총 수수료</p>
-            <p className="text-xl font-bold text-green-600">{formatCurrency(stats?.data?.totalPlatformFees || 0)}</p>
+            <p className="text-xl font-bold text-green-600">{formatCurrency(stats?.totalPlatformFees || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">이번 달 수수료</p>
-            <p className="text-xl font-bold">{formatCurrency(stats?.data?.monthlyPlatformFees || 0)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.monthlyPlatformFees || 0)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">완료 거래</p>
-            <p className="text-xl font-bold">{stats?.data?.completedDeals || 0}건</p>
+            <p className="text-xl font-bold">{stats?.completedDeals || 0}건</p>
           </div>
         </div>
       </div>
 
       {/* 경고 */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`bg-white rounded-xl p-5 ${(stats?.data?.pendingReports || 0) > 0 ? 'ring-2 ring-red-400' : ''}`}>
+        <div className={`bg-white rounded-xl p-5 ${(stats?.pendingReports || 0) > 0 ? 'ring-2 ring-red-400' : ''}`}>
           <p className="text-sm text-gray-500">대기 중인 신고</p>
-          <p className="text-2xl font-bold text-red-600">{stats?.data?.pendingReports || 0}</p>
+          <p className="text-2xl font-bold text-red-600">{stats?.pendingReports || 0}</p>
         </div>
         <div className="bg-white rounded-xl p-5">
           <p className="text-sm text-gray-500">직거래 시도 (이번 달)</p>
-          <p className="text-2xl font-bold text-orange-600">{stats?.data?.directTradeAttempts || 0}</p>
+          <p className="text-2xl font-bold text-orange-600">{stats?.directTradeAttempts || 0}</p>
         </div>
       </div>
     </div>
@@ -213,6 +235,9 @@ function UsersTab() {
     }
   };
 
+  const users = data?.items || [];
+  const totalPages = data?.totalPages || 1;
+
   return (
     <div className="space-y-4">
       {/* 검색 */}
@@ -242,31 +267,44 @@ function UsersTab() {
             </div>
           ))}
         </div>
+      ) : users.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">유저가 없습니다</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {data?.data?.items.map((user) => (
+          {users.map((user: UserItem) => (
             <div key={user.id} className="bg-white rounded-xl p-4">
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium">{user.name || '이름 없음'}</p>
-                  <p className="text-sm text-gray-500">{user.email}</p>
-                  <div className="flex gap-2 mt-2 text-xs">
-                    <span className="px-2 py-0.5 bg-gray-100 rounded">
-                      수익: {formatCurrency(user.totalEarnings)}
-                    </span>
-                    <span className="px-2 py-0.5 bg-gray-100 rounded">
-                      거래: {user.completedDeals}건
-                    </span>
-                    {user.warningCount > 0 && (
-                      <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded">
-                        경고: {user.warningCount}회
-                      </span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                    {user.profileImageUrl ? (
+                      <img src={user.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-gray-400">👤</span>
                     )}
-                    {user.adMatchingSuspended && (
-                      <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded">
-                        정지됨
+                  </div>
+                  <div>
+                    <p className="font-medium">{user.name || '이름 없음'}</p>
+                    <p className="text-sm text-gray-500">{user.email}</p>
+                    <div className="flex gap-2 mt-2 text-xs">
+                      <span className="px-2 py-0.5 bg-gray-100 rounded">
+                        게시글: {user.postCount || 0}개
                       </span>
-                    )}
+                      <span className="px-2 py-0.5 bg-gray-100 rounded">
+                        가입: {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                      </span>
+                      {user.warningCount > 0 && (
+                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded">
+                          경고: {user.warningCount}회
+                        </span>
+                      )}
+                      {user.suspendedUntil && new Date(user.suspendedUntil) > new Date() && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded">
+                          정지됨
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -281,7 +319,7 @@ function UsersTab() {
           ))}
 
           {/* 페이지네이션 */}
-          {data && data?.data?.totalPages > 1 && (
+          {totalPages > 1 && (
             <div className="flex justify-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -290,10 +328,10 @@ function UsersTab() {
               >
                 이전
               </button>
-              <span className="px-4 py-2">{page} / {data?.data?.totalPages}</span>
+              <span className="px-4 py-2">{page} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => p + 1)}
-                disabled={page === data?.data?.totalPages}
+                disabled={page === totalPages}
                 className="px-4 py-2 bg-white rounded-lg disabled:opacity-50"
               >
                 다음
@@ -326,6 +364,8 @@ function ReportsTab() {
     processMutation.mutate({ reportId, status, punishUser: punish });
   };
 
+  const reports = data?.items || [];
+
   return (
     <div className="space-y-4">
       {/* 필터 */}
@@ -353,20 +393,20 @@ function ReportsTab() {
             </div>
           ))}
         </div>
-      ) : data?.data?.items.length === 0 ? (
+      ) : reports.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500">신고가 없습니다</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {data?.data?.items.map((report) => (
+          {reports.map((report: ReportItem) => (
             <div key={report.id} className="bg-white rounded-xl p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="text-sm">
-                    <span className="font-medium">{report.reporter.name || report.reporter.email}</span>
+                    <span className="font-medium">{report.reporter?.name || report.reporter?.email || '알 수 없음'}</span>
                     {' → '}
-                    <span className="text-red-600 font-medium">{report.reported.name || report.reported.email}</span>
+                    <span className="text-red-600 font-medium">{report.reported?.name || report.reported?.email || '알 수 없음'}</span>
                   </p>
                   <p className="text-xs text-gray-400">{formatRelativeTime(report.createdAt)}</p>
                 </div>
@@ -409,12 +449,12 @@ function ReportsTab() {
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color?: string }) {
+function StatCard({ label, value, color }: { label: string; value?: number; color?: string }) {
   const colorClass = color === 'blue' ? 'text-blue-600' : color === 'purple' ? 'text-purple-600' : 'text-gray-900';
   return (
     <div className="bg-white rounded-xl p-4">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className={`text-2xl font-bold ${colorClass}`}>{value.toLocaleString()}</p>
+      <p className={`text-2xl font-bold ${colorClass}`}>{(value ?? 0).toLocaleString()}</p>
     </div>
   );
 }
