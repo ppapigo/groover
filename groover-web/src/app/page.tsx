@@ -1,30 +1,58 @@
 // src/app/page.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/layout/AppHeader';
 import { useFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
+import api from '@/lib/api';
 import { Eye, Heart, PenLine, TrendingUp } from 'lucide-react';
 
-const trendingTags = ['육아', '뷰티', '가전', '캠핑', '식품', '패션', '여행', '인테리어', '운동', '자동차'];
+interface PopularTag {
+  name: string;
+  slug?: string;
+  postCount: number;
+}
 
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const { posts, isLoading, fetchPosts } = useFeed({});
+  const [trendingTags, setTrendingTags] = useState<PopularTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
 
   useEffect(() => {
     fetchPosts(null);
+    fetchPopularTags();
   }, []);
+
+  const fetchPopularTags = async () => {
+    try {
+      const res = await api.get('/blog/tags/popular?limit=10');
+      const tags = res.data.data || res.data || [];
+      setTrendingTags(tags);
+    } catch (err) {
+      console.error('인기 태그 불러오기 실패:', err);
+      // 실패 시 기본 태그 표시
+      setTrendingTags([
+        { name: '전자기기', postCount: 0 },
+        { name: '패션', postCount: 0 },
+        { name: '뷰티', postCount: 0 },
+        { name: '음식', postCount: 0 },
+        { name: '여행', postCount: 0 },
+      ]);
+    } finally {
+      setTagsLoading(false);
+    }
+  };
 
   const handleWriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     if (authLoading) return;
-    
+
     if (!user) {
       if (confirm('글을 작성하려면 로그인이 필요합니다. 로그인하시겠습니까?')) {
         router.push('/login?redirect=/write');
@@ -61,7 +89,7 @@ export default function HomePage() {
       <div className="home-page">
         <section className="hero-section">
           <h1>쇼핑 리뷰 커뮤니티</h1>
-          <p>솔직한 리뷰와 추천을 공유하세요</p>
+          <p>솔직한 리뷰를 추천해 공유하세요</p>
           <button onClick={handleWriteClick} className="cta-btn" disabled={authLoading}>
             <PenLine size={18} />
             글 쓰기
@@ -69,13 +97,20 @@ export default function HomePage() {
         </section>
 
         <section className="tags-section">
-          <h2>지금 뜨는 태그</h2>
+          <h2>🔥 인기 태그</h2>
           <div className="tag-chips">
-            {trendingTags.map((tag) => (
-              <Link key={tag} href={`/blog?tag=${tag}`} className="tag-chip">
-                #{tag}
-              </Link>
-            ))}
+            {tagsLoading ? (
+              <div className="tags-loading">로딩 중...</div>
+            ) : trendingTags.length > 0 ? (
+              trendingTags.map((tag) => (
+                <Link key={tag.name} href={`/blog?tag=${encodeURIComponent(tag.name)}`} className="tag-chip">
+                  #{tag.name}
+                  {tag.postCount > 0 && <span className="tag-count">{tag.postCount}</span>}
+                </Link>
+              ))
+            ) : (
+              <p className="no-tags">아직 태그가 없습니다</p>
+            )}
           </div>
         </section>
 
@@ -192,6 +227,9 @@ export default function HomePage() {
           gap: 8px;
         }
         .tag-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           padding: 8px 14px;
           background: #f0f0f0;
           border-radius: 20px;
@@ -203,6 +241,21 @@ export default function HomePage() {
         .tag-chip:hover {
           background: #667eea;
           color: white;
+        }
+        .tag-chip:hover .tag-count {
+          background: rgba(255,255,255,0.3);
+          color: white;
+        }
+        .tag-count {
+          font-size: 11px;
+          padding: 2px 6px;
+          background: #ddd;
+          border-radius: 10px;
+          color: #666;
+        }
+        .tags-loading, .no-tags {
+          color: #999;
+          font-size: 13px;
         }
         .feed-section {
           padding: 20px;
@@ -223,8 +276,7 @@ export default function HomePage() {
           color: #667eea;
           text-decoration: none;
         }
-        
-        /* 인기글 리스트 스타일 */
+
         .popular-list {
           display: flex;
           flex-direction: column;
@@ -298,7 +350,7 @@ export default function HomePage() {
         .popular-item:last-child .divider {
           display: none;
         }
-        
+
         .loading {
           display: flex;
           justify-content: center;
