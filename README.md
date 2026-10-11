@@ -1,53 +1,42 @@
-# 🛒 Groover - AI 기반 스마트 장바구니 추천 앱
+# Groover
 
-> 예산을 입력하면 AI가 최적의 상품 조합을 자동으로 추천해주는 스마트 쇼핑 앱
+Groover는 여러 사용자의 상품 경험을 한곳에서 찾고 공유하는 리뷰 모음 서비스입니다.
 
-## 📋 프로젝트 구조
+## 구성
+
+- `groover-web`: Next.js 웹 클라이언트
+- `groover-api`: Spring Boot 3 / Spring Data JPA REST API
+- `docs`: 아키텍처, API, 배포 문서
+
+기존 NestJS/Prisma 백엔드, 미구현 Python AI 추천 서버, AI 장바구니 모바일 데모는 제거했습니다.
+
+## 로컬 실행
+
+필수 도구는 Java 21, Maven 3.9+, Node.js 20+, Docker입니다.
+
+```bash
+docker compose up -d db
+cd groover-api
+mvn spring-boot:run
 ```
-groover/
-├── groover-api/      # 백엔드 API (NestJS)
-├── groover-app/      # 모바일 앱 (React Native)
-├── groover-ai/       # AI 추천 엔진 (Python)
-└── docs/            # 프로젝트 문서
+
+다른 터미널에서 웹을 실행합니다.
+
+```bash
+cd groover-web
+npm ci
+npm run dev
 ```
 
-## 🚀 빠른 시작
+API 기본 주소는 `http://localhost:3000/v1`, 웹 기본 주소는 `http://localhost:3001`입니다. 웹 환경변수 `NEXT_PUBLIC_API_URL`로 API 주소를 바꿀 수 있습니다.
 
-### 백엔드 실행
+## 테스트
+
 ```bash
 cd groover-api
-npm install
-cp .env.example .env
-npm run start:dev
+mvn test
 ```
 
-### 프론트엔드 실행
-```bash
-cd groover-app
-npm install
-cp .env.example .env
-npx react-native run-ios  # or run-android
-```
+테스트는 별도 PostgreSQL 없이 H2의 PostgreSQL 호환 모드를 사용합니다.
 
-### AI 엔진 실행
-```bash
-cd groover-ai
-pip install -r requirements.txt
-python src/server.py
-```
-
-## 📚 문서
-
-- [API 명세서](docs/API.md)
-- [시스템 아키텍처](docs/ARCHITECTURE.md)
-- [배포 가이드](docs/DEPLOYMENT.md)
-
-## 🛠️ 기술 스택
-
-- **Frontend**: React Native, TypeScript
-- **Backend**: NestJS, PostgreSQL, Redis
-- **AI**: Python, OpenAI GPT-4
-
-## 📄 라이센스
-
-MIT License
+자세한 내용은 [아키텍처](docs/ARCHITECTURE.md), [API](docs/API.md), [배포](docs/DEPLOYMENT.md)를 참고하세요.

@@ -11,6 +11,7 @@ node_modules/
 # Build & Production
 build/
 dist/
+target/
 *.tsbuildinfo
 
 # Logs
@@ -54,12 +55,6 @@ groover-app/ios/*.xcworkspace
 # Database
 *.db
 *.sqlite
-
-# Python
-__pycache__/
-*.py[cod]
-groover-ai/venv/
-groover-ai/ENV/
 
 # Secrets
 *secret*

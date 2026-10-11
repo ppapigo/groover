@@ -1,4 +1,0 @@
-// src/blog/dto/index.ts
-export * from './create-post.dto';
-export * from './update-post.dto';
-export * from './feed-query.dto';
