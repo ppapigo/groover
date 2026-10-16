@@ -14,8 +14,9 @@ import WritePage from '@/pages/WritePage';
 
 export default function App() {
   const { pathname } = useLocation();
+  const isAuthPage = /^\/(login|signup)\/?$/i.test(pathname);
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
-  return <div className="app-shell">
+  return <div className={`app-shell${isAuthPage ? ' app-shell--auth' : ''}`}>
     <AppHeader />
     <main id="main-content"><Routes>
       <Route path="/" element={<HomePage />} />
