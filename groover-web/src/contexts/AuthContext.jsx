@@ -1,96 +1,71 @@
-// src/contexts/AuthContext.tsx
-'use client';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api, { setAccessToken } from '@/lib/api';
-const AuthContext = createContext(undefined);
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import api, { AUTH_EXPIRED_EVENT, getAccessToken, setAccessToken } from '@/lib/api';
+
+const AuthContext = createContext(null);
+
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [initialized, setInitialized] = useState(false);
-    const refreshUser = useCallback(async () => {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-        if (token) {
-            try {
-                const response = await api.get('/auth/me');
-                setUser(response.data.data);
-            }
-            catch (error) {
-                setAccessToken(null);
-                setUser(null);
-            }
-        }
-    }, []);
-    useEffect(() => {
-        // 이미 초기화되었으면 스킵
-        if (initialized)
-            return;
-        const initAuth = async () => {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-            if (token) {
-                try {
-                    const response = await api.get('/auth/me');
-                    setUser(response.data.data);
-                }
-                catch (error) {
-                    setAccessToken(null);
-                    setUser(null);
-                }
-            }
-            setIsLoading(false);
-            setInitialized(true);
-        };
-        initAuth();
-    }, [initialized]);
-    const login = useCallback(async (loginData) => {
-        const response = await api.post('/auth/login', loginData);
-        const { user, accessToken } = response.data.data;
-        setAccessToken(accessToken);
-        setUser(user);
-    }, []);
-    const register = useCallback(async (email, password, name) => {
-        const response = await api.post('/auth/register', { email, password, name });
-        return response.data;
-    }, []);
-    const logout = useCallback(async () => {
-        try {
-            await api.post('/auth/logout');
-        }
-        catch (error) {
-            // 에러 무시
-        }
-        setAccessToken(null);
-        setUser(null);
-    }, []);
-    const logoutAll = useCallback(async () => {
-        try {
-            await api.post('/auth/logout-all');
-        }
-        catch (error) {
-            // 에러 무시
-        }
-        setAccessToken(null);
-        setUser(null);
-    }, []);
-    // 토큰이 있으면 일단 인증된 것으로 간주 (로딩 중일 때)
-    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
-    const isAuthenticated = !!user || (isLoading && hasToken);
-    return (<AuthContext.Provider value={{
-            user,
-            isLoading,
-            isAuthenticated,
-            login,
-            register,
-            logout,
-            logoutAll,
-            refreshUser,
-        }}>
-      {children}
-    </AuthContext.Provider>);
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const token = getAccessToken();
+    setIsLoading(true);
+    setError(null);
+    if (!token) setIsLoading(false);
+    else api.get('/auth/me', { signal: controller.signal })
+      .then(response => { if (getAccessToken() === token) setUser(response.data.data); })
+      .catch(err => {
+        if (!controller.signal.aborted && err.response?.status !== 401) setError(err);
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
+    return () => controller.abort();
+  }, [attempt]);
+
+  useEffect(() => {
+    const clearSession = () => { setUser(null); setError(null); queryClient.clear(); };
+    const storageChanged = (event) => {
+      if (event.key === 'accessToken' || event.key === null) { clearSession(); setAttempt(value => value + 1); }
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, clearSession);
+    window.addEventListener('storage', storageChanged);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, clearSession);
+      window.removeEventListener('storage', storageChanged);
+    };
+  }, [queryClient]);
+
+  async function authenticate(path, data) {
+    const response = await api.post(path, data);
+    queryClient.clear();
+    setAccessToken(response.data.data.accessToken);
+    setUser(response.data.data.user);
+    setError(null);
+    setIsLoading(false);
+  }
+
+  function logout() {
+    // The API uses stateless JWTs; logging out discards the local session.
+    setAccessToken(null);
+    setUser(null);
+    setError(null);
+    queryClient.clear();
+  }
+
+  return <AuthContext.Provider value={{
+    user, isLoading, error, isAuthenticated: Boolean(user), logout,
+    retry: () => setAttempt(value => value + 1),
+    login: data => authenticate('/auth/login', data),
+    register: data => authenticate('/auth/register', data),
+  }}>{children}</AuthContext.Provider>;
 }
+
 export function useAuth() {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
 }

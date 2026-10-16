@@ -21,8 +21,9 @@
 
 | Method | Path | 인증 | 설명 |
 |---|---|---:|---|
-| GET | `/blog/feed?page=0&limit=20` | - | 최신 공개 리뷰 |
-| GET | `/blog/feed/popular?page=0&limit=20` | - | 좋아요·조회수 순 리뷰 |
+| GET | `/blog/feed?cursor=0&limit=20` | - | 최신 공개 리뷰 |
+| GET | `/blog/feed/popular?cursor=0&limit=20` | - | 좋아요·조회수 순 리뷰 |
+| GET | `/blog/feed/tag/{tag}?cursor=0&limit=20` | - | 태그별 최신 공개 리뷰 |
 | GET | `/blog/posts/{slug-or-id}` | - | 리뷰 상세 |
 | POST | `/blog/posts` | 필요 | 리뷰 작성 |
 | PUT | `/blog/posts/{id}` | 필요 | 본인 리뷰 수정 |
@@ -56,3 +57,11 @@
 | GET | `/tags/free/search?q=키보드` | - | 태그 자동완성 |
 
 검증 실패는 400, 인증 실패는 401, 소유권 위반은 403, 없는 리소스는 404를 반환합니다.
+
+피드의 `data`는 `{ items, nextCursor, hasMore }`입니다. 다음 요청에는 `nextCursor`를 `cursor`로 전달합니다. 내 리뷰는 `/blog/my-posts?page=0&limit=20`으로 페이지 처리하고 공개·임시저장 리뷰를 함께 반환합니다. `/blog/my-drafts`는 첫 50개 내 리뷰에서 임시저장 상태를 필터링하므로 웹에서는 내 리뷰 페이지 조회를 사용합니다.
+
+검색 응답은 다른 API와 달리 최상위 `{ posts: [...] }` 형식입니다. 댓글 조회에는 리뷰 상세에서 받은 UUID를 사용합니다.
+
+작성과 임시저장 모두 제목(최대 200자), 본문(10~50,000자)이 필요합니다. 요약은 `excerpt`(최대 300자), 사진은 `previewImage` URL(최대 500자), 태그는 최대 10개(각 40자)입니다. `metadata`는 `productName`, `storeName`, `price`(0 이상), `rating`(1~5), `purchaseStatus`를 지원합니다.
+
+수정 요청의 `publish: true`는 즉시 발행합니다. 이미 발행한 리뷰를 임시저장으로 바꿀 때는 수정 후 `/blog/posts/{id}/publish`에 `{ "publish": false }`를 보내야 합니다. 이미지 업로드와 JWT 갱신 API는 없습니다.

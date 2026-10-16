@@ -1,19 +1,15 @@
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Eye, Heart, MessageCircle, Star } from 'lucide-react';
-function dateLabel(value) {
-    if (!value)
-        return '';
-    return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(value));
-}
+import { dateLabel, imageUrl } from '@/lib/reviewContent';
 export default function ReviewCard({ review, featured = false }) {
     const summary = review.excerpt || review.content?.replace(/<[^>]*>/g, '').slice(0, 120) || '';
-    return (<Link href={`/blog/${review.slug}`} className={`review-card ${featured ? 'review-card-featured' : ''}`}>
+    return (<Link to={review.status === 'DRAFT' ? `/write?edit=${review.id}` : `/blog/${review.slug}`} className={`review-card ${featured ? 'review-card-featured' : ''}`}>
       <div className="review-card-media">
-        {review.previewImage ? <img src={review.previewImage} alt=""/> : <div className="review-card-placeholder"><span>G</span></div>}
+        {imageUrl(review.previewImage) ? <img src={imageUrl(review.previewImage)} alt="" loading="lazy"/> : <div className="review-card-placeholder"><span>G</span></div>}
         {review.metadata?.rating && <span className="rating-badge"><Star size={13} fill="currentColor"/> {review.metadata.rating}.0</span>}
       </div>
       <div className="review-card-body">
-        <div className="review-card-kicker">{review.metadata?.productName || review.tags?.[0] || '사용자 리뷰'}</div>
+        <div className="review-card-kicker">{review.status === 'DRAFT' ? '임시저장' : review.metadata?.productName || review.tags?.[0] || '사용자 리뷰'}</div>
         <h3>{review.title}</h3>
         <p>{summary}</p>
         <div className="review-card-tags">{review.tags?.slice(0, 3).map(tag => <span key={tag}>#{tag}</span>)}</div>

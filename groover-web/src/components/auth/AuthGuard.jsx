@@ -1,44 +1,12 @@
-// src/components/auth/AuthGuard.tsx
-'use client';
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-export function AuthGuard({ children, fallback }) {
-    const { user, isLoading, refreshUser } = useAuth();
-    const router = useRouter();
-    const pathname = usePathname();
-    const [checked, setChecked] = useState(false);
-    useEffect(() => {
-        const checkAuth = async () => {
-            // 로딩 중이면 대기
-            if (isLoading)
-                return;
-            const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
-            if (!hasToken) {
-                // 토큰 없으면 로그인으로
-                const redirectUrl = encodeURIComponent(pathname);
-                router.push(`/login?redirect=${redirectUrl}`);
-                return;
-            }
-            if (!user && hasToken) {
-                // 토큰은 있는데 user가 없으면 다시 로드
-                await refreshUser();
-            }
-            setChecked(true);
-        };
-        checkAuth();
-    }, [isLoading, user, router, pathname, refreshUser]);
-    // 로딩 중이거나 체크 안 됐으면 로딩 표시
-    if (isLoading || !checked) {
-        return fallback || (<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #eee', borderTopColor: '#0f62fe', borderRadius: '50%', animation: 'spin 1s linear infinite' }}/>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>);
-    }
-    // 토큰 없고 user도 없으면 null (리다이렉트 중)
-    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
-    if (!user && !hasToken) {
-        return null;
-    }
-    return <>{children}</>;
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import ErrorNotice from '@/components/ErrorNotice';
+
+export function AuthGuard() {
+  const { user, isLoading, error, retry } = useAuth();
+  const location = useLocation();
+  if (isLoading) return <div className="full-loading" role="status">로그인 정보를 확인하는 중…</div>;
+  if (error) return <ErrorNotice error={error} retry={retry} />;
+  if (!user) return <Navigate replace to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} />;
+  return <Outlet />;
 }

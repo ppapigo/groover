@@ -1,0 +1,23 @@
+name: Web checks
+on:
+  push:
+    paths: ['groover-web/**', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['groover-web/**', '.github/workflows/web.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: groover-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: groover-web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

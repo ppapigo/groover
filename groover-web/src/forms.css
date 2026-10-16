@@ -1,0 +1,65 @@
+main { min-height: calc(100vh - 72px); }
+.muted { color: var(--muted); font-size: 14px; }
+.form-page, .detail-page { width: min(820px, calc(100% - 40px)); margin: 56px auto 100px; }
+.auth-page { max-width: 460px; }
+.form-page h1, .review-heading h1 { font: 600 clamp(28px, 4vw, 40px)/1.4 var(--font-serif), serif; margin: 12px 0; overflow-wrap: anywhere; }
+.stack-form, .stack-form fieldset { display: flex; flex-direction: column; gap: 18px; }
+.stack-form { margin: 28px 0; }
+.stack-form fieldset { border: 0; min-width: 0; }
+.stack-form label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600; }
+.stack-form input, .stack-form textarea, .stack-form select { padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; width: 100%; }
+.stack-form textarea { resize: vertical; line-height: 1.8; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.primary-cta { border: 1px solid var(--green); }
+.auth-switch { text-align: center; font-size: 14px; }
+.auth-switch a { font-weight: 700; color: var(--green); }
+.profile-links { display: grid; gap: 12px; margin: 32px 0; }
+.profile-links a { display: flex; align-items: center; gap: 12px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 14px; text-decoration: none; }
+.my-review { display: flex; flex-direction: column; gap: 10px; }
+.my-review .review-card { flex: 1; }
+.review-heading { margin: 28px 0; }
+.review-metadata { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+.review-metadata span { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--soft); border-radius: 10px; font-size: 14px; }
+.detail-image, .editor-image { display: block; width: 100%; max-height: 500px; object-fit: contain; background: var(--soft); border-radius: 16px; margin-bottom: 24px; }
+.editor-image { max-height: 250px; }
+.review-excerpt { padding: 20px; margin-bottom: 28px; border-left: 3px solid var(--green); background: var(--soft); }
+.review-content { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }
+.review-content img { display: block; height: auto; margin: 20px auto; border-radius: 12px; max-height: 800px; object-fit: contain; }
+.detail-tags { justify-content: flex-start; margin: 30px 0; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 20px 0; }
+.text-button { border: 0; background: none; padding: 8px 0; color: var(--green); }
+.danger { color: #a74324; }
+.comments-section { margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--line); }
+.comments-section h2 { margin-bottom: 20px; font-size: 22px; }
+.comment { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.comment-heading { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.comment-heading time { color: var(--muted); font-size: 12px; }
+.comment-heading button { margin-left: auto; }
+.comment p { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px; }
+.editor-preview { border: 1px solid var(--line); padding: 24px; border-radius: 14px; background: white; }
+.editor-preview h2 { margin-bottom: 24px; }
+.success-notice { color: var(--green); }
+.filter-bar { gap: 10px; }
+.filter-bar select { padding: 8px; border-radius: 8px; background: white; flex-shrink: 0; }
+.category-scroll { min-width: 0; overflow-x: auto; }
+.category-scroll a { white-space: nowrap; }
+.search-box input { min-width: 0; }
+.hero-search { text-decoration: none; position: relative; z-index: 1; }
+.error-panel .secondary-cta { margin-top: 10px; }
+.review-card-tags { flex-wrap: wrap; overflow-wrap: anywhere; }
+.review-card h3 { overflow-wrap: anywhere; }
+@media (max-width: 850px) {
+  main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .bottom-nav { bottom: calc(10px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 560px) {
+  .form-page, .detail-page { width: calc(100% - 28px); margin-top: 32px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar select { align-self: flex-end; }
+  .review-card-footer { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

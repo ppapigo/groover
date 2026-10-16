@@ -1,7 +1,7 @@
 # 아키텍처
 
 ```text
-Next.js Web
+React + Vite SPA (React Router / TanStack Query)
     │ HTTPS / JSON + Bearer JWT
     ▼
 Spring Boot API
@@ -31,3 +31,15 @@ Spring Data JPA + PostgreSQL
 - `comments`: 리뷰 댓글
 
 광고 거래, 에스크로, DM, 푸시 알림, AI 추천 기능은 리뷰 모음의 핵심 범위에서 제외했습니다. 최신/인기 피드는 명시적인 정렬 기준으로 제공하며 AI 모델을 호출하지 않습니다.
+
+## 웹 구성
+
+- `src/main.jsx`: React 루트와 공통 Provider
+- `src/App.jsx`: 공개 라우트와 인증이 필요한 라우트
+- `src/pages`: 홈, 리뷰 탐색·상세·작성, 검색, 인증, 내 기록
+- `src/components/review`: 리뷰 카드, 본문 이미지 렌더링, 댓글
+- `src/lib/api.js`: API 주소 및 Bearer JWT 처리
+- `src/lib/reviewApi.js`: Spring 리뷰 API 요청·응답 계약
+- TanStack Query는 조회 상태, 취소, 캐시 무효화와 커서 페이지 처리를 담당합니다. 인증 상태 변경 시 사용자별 캐시를 비웁니다.
+
+웹은 정적 SPA이며 서버 렌더링이나 프레임워크 서버 없이 배포합니다. 기존 `/blog` 주소와 Spring API 경로는 유지합니다.
