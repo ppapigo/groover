@@ -36,7 +36,7 @@ export default function AuthPage({ signup = false }) {
     <header className="auth-heading">
       <span className="section-label">WELCOME TO GROOVER</span>
       <h1 id="auth-title">{signup ? '경험을 함께 나눠요.' : '다시 만나 반가워요.'}</h1>
-      <p className="muted">{signup ? '계정을 만들고 나만의 리뷰를 기록해보세요.' : '로그인하고 리뷰와 댓글을 남겨보세요.'}</p>
+      <p className="muted">{signup ? '이메일 인증 없이 가입 즉시 리뷰를 작성할 수 있어요.' : '로그인하고 리뷰와 댓글을 남겨보세요.'}</p>
     </header>
     <form onSubmit={submit} className="stack-form auth-form">
       {signup ? <>

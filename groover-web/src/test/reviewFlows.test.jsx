@@ -94,7 +94,22 @@ describe('React review flows against the Spring API contract', () => {
     await action.click(screen.getByRole('button', { name: '회원가입', exact: true }));
     expect(await screen.findByRole('heading', { name: '리뷰어님의 기록' })).toBeInTheDocument();
     expect(requests.find(request => request.url === '/auth/register').body).toEqual({ userId: 'reviewer', email: 'reviewer@example.com', name: '리뷰어', password: 'password123' });
-    expect(requests.some(request => request.url === '/auth/login')).toBe(false);
+    expect(requests.filter(request => request.url.startsWith('/auth/')).map(request => request.url)).toEqual(['/auth/register']);
+    expect(localStorage.getItem('accessToken')).toBe('new-token');
+    await action.click(screen.getByRole('link', { name: '내 리뷰', exact: true }));
+    expect(await screen.findByRole('heading', { name: '내 리뷰' })).toBeInTheDocument();
+    await waitFor(() => expect(requests.find(request => request.url === '/blog/my-posts')?.authorization).toBe('Bearer new-token'));
+  });
+
+  it('opens the requested editor immediately after signup', async () => {
+    const action = open('/signup?redirect=%2Fwrite');
+    await action.type(await screen.findByLabelText('아이디'), 'reviewer');
+    await action.type(screen.getByLabelText('이메일', { exact: true }), 'reviewer@example.com');
+    await action.type(screen.getByLabelText('이름'), '리뷰어');
+    await action.type(screen.getByLabelText('비밀번호'), 'password123');
+    await action.click(screen.getByRole('button', { name: '회원가입', exact: true }));
+    expect(await screen.findByLabelText('상세 후기')).toBeInTheDocument();
+    expect(requests.filter(request => request.url.startsWith('/auth/')).map(request => request.url)).toEqual(['/auth/register']);
   });
 
   it('expires a rejected session without calling an unsupported refresh endpoint', async () => {

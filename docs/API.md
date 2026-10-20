@@ -17,6 +17,8 @@
 {"userId":"reviewer01","email":"reviewer@example.com","password":"password123","name":"리뷰어"}
 ```
 
+회원가입은 이메일 인증 코드나 인증 링크 확인 없이 즉시 완료됩니다. 성공 응답의 `data`에는 `user`와 `accessToken`이 포함되며, 프론트엔드는 이 토큰으로 바로 로그인 상태를 적용합니다. 가입 후 별도 로그인 없이 내 정보 조회와 리뷰 작성이 가능합니다. 이메일 형식 및 이메일·아이디 중복 검사는 유지합니다.
+
 ## 리뷰
 
 | Method | Path | 인증 | 설명 |
