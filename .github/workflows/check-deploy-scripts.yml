@@ -8,6 +8,15 @@ on:
 permissions:
   contents: read
 jobs:
+  docker-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real Docker rollback in isolated fixtures
+        env:
+          CI_PROJECT_KIND: groover
+        run: bash scripts/tests/integration-docker-rollback.sh
   syntax:
     runs-on: ubuntu-latest
     steps:
