@@ -30,7 +30,7 @@ case "$1" in
       [[ "$arg" == frontend || "$arg" == web ]] && frontend=1
       [[ "$arg" == *-rollback.*.yml ]] && rollback=1
     done
-    if [[ "$up" == 1 && "$frontend" == 1 && "$rollback" == 0 && "\${MOCK_FAIL_FRONTEND:-0}" == 1 && ! -f "$MOCK_FAIL_MARKER" ]]; then
+    if [[ "$up" == 1 && "$frontend" == 1 && "$rollback" == 0 && "${MOCK_FAIL_FRONTEND:-0}" == 1 && ! -f "$MOCK_FAIL_MARKER" ]]; then
       touch "$MOCK_FAIL_MARKER"
       exit 78
     fi
