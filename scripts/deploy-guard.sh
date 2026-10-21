@@ -12,10 +12,18 @@ compose() { docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJE
 services=(api web)
 containers=(groover-prod-api-1 groover-prod-web-1)
 declare -a previous=()
+declare -a rollback_refs=()
+release_short="${APP_IMAGE_TAG:0:12}"
 for container in "${containers[@]}"; do
   previous+=("$(docker inspect --type container --format '{{.Image}}' "$container")")
   test -n "${previous[-1]}"
   docker image inspect "${previous[-1]}" >/dev/null
+done
+for i in "${!services[@]}"; do
+  # Tag the exact running image ID; old mutable tags may have been repointed.
+  rollback_ref="local/groover-rollback-${services[i]}:${release_short}"
+  docker image tag "${previous[i]}" "$rollback_ref"
+  rollback_refs+=("$rollback_ref")
 done
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
 trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
@@ -34,7 +42,7 @@ rollback() {
   chmod 600 "$rollback_file"
   printf 'services:\n' > "$rollback_file"
   for i in "${!services[@]}"; do
-    printf '  %s:\n    image: %s\n' "${services[i]}" "${previous[i]}" >> "$rollback_file"
+    printf '  %s:\n    image: %s\n' "${services[i]}" "${rollback_refs[i]}" >> "$rollback_file"
   done
   # Override only application image references; never restart dependencies.
   if ! compose -f "$rollback_file" up -d --no-deps --no-build --wait "${services[@]}"; then
