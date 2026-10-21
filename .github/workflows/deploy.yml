@@ -71,6 +71,7 @@ jobs:
             test -d "$RELEASE_DIR/.git" || { echo "Release checkout invalid"; exit 1; }
             ACTUAL_SHA="$(git -C "$RELEASE_DIR" rev-parse HEAD)"
             test "$ACTUAL_SHA" = "$APP_IMAGE_TAG" || { echo "Release SHA mismatch: expected $APP_IMAGE_TAG; got $ACTUAL_SHA"; exit 1; }
+            export PROJECT RELEASE_DIR
             cd "$RELEASE_DIR"
             docker network inspect proxy-net >/dev/null
             export APP_IMAGE_TAG
