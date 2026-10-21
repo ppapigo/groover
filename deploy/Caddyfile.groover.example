@@ -1,0 +1,10 @@
+# Merge this site block into the existing Caddy configuration only after approval.
+# Caddy must be the direct Internet-facing proxy for this IP policy.
+grooverapp.com {
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy groover-web:8080 {
+        header_up X-Forwarded-For {remote_host}
+        header_up -Forwarded
+        header_up -X-Real-IP
+    }
+}

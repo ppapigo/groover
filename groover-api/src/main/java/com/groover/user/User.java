@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Locale;
 
 @Entity
 @Table(name = "users")
@@ -22,7 +23,7 @@ public class User {
     public User(String userId, String email, String passwordHash, String name) {
         this.id = UUID.randomUUID();
         this.userId = userId;
-        this.email = email.toLowerCase();
+        this.email = email.toLowerCase(Locale.ROOT);
         this.passwordHash = passwordHash;
         this.name = name;
         this.createdAt = Instant.now();

@@ -1,0 +1,106 @@
+name: groover-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    entrypoint: ["/bin/sh", "/usr/local/bin/groover-postgres-entrypoint.sh"]
+    command: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: groover
+      POSTGRES_USER: groover_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random production DB password}
+      GROOVER_APP_PASSWORD: ${DATABASE_PASSWORD:?Set a separate random application DB password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - groover-data:/var/lib/postgresql/data
+      - ./deploy/postgres-entrypoint.sh:/usr/local/bin/groover-postgres-entrypoint.sh:ro
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-groover.sh:ro
+    networks: [database]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groover_admin -d groover"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 128m
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 200
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  api:
+    build: ./groover-api
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://db:5432/groover
+      DATABASE_USERNAME: groover
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set a separate random application DB password}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 encoded random signing key}
+      TRUSTED_PROXY_IPS: ${GROOVER_WEB_INTERNAL_IP:-172.31.240.10}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65 -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [application, database]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=128m,uid=10001,gid=10001"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 200
+    logging: *logging
+
+  web:
+    build:
+      context: ./groover-web
+      args:
+        VITE_API_URL: /v1
+    restart: unless-stopped
+    environment:
+      CADDY_PROXY_IP: ${CADDY_PROXY_IP:?Set the exact Caddy IP on proxy-net}
+      NGINX_ENVSUBST_OUTPUT_DIR: /tmp/nginx
+      NGINX_ENVSUBST_FILTER: ^CADDY_PROXY_IP$
+    # Writable generated config is kept in tmpfs; the image filesystem remains read-only.
+    command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/groover.conf"]
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      proxy-net:
+        aliases: [groover-web]
+      application:
+        ipv4_address: ${GROOVER_WEB_INTERNAL_IP:-172.31.240.10}
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,uid=101,gid=101"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 100
+    logging: *logging
+
+networks:
+  proxy-net:
+    external: true
+    name: proxy-net
+  application:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${GROOVER_APP_SUBNET:-172.31.240.0/24}
+  database:
+    internal: true
+
+volumes:
+  groover-data:
+    external: true
+    name: ${GROOVER_DB_VOLUME:?Set the reviewed Groover data volume name}

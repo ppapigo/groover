@@ -1,5 +1,13 @@
 package com.groover.review;
 
+import com.groover.review.dto.AuthorResponse;
+import com.groover.review.dto.CommentResponse;
+import com.groover.review.dto.FeedResponse;
+import com.groover.review.dto.LikeResponse;
+import com.groover.review.dto.ReviewMetadata;
+import com.groover.review.dto.ReviewRequest;
+import com.groover.review.dto.ReviewResponse;
+import com.groover.review.dto.TagResponse;
 import com.groover.user.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.*;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Service @RequiredArgsConstructor
 public class ReviewService {
@@ -17,14 +27,15 @@ public class ReviewService {
     private final CommentRepository comments; private final UserRepository users;
 
     @Transactional
-    public ReviewDtos.ReviewResponse create(User author, ReviewDtos.ReviewRequest req) {
+    public ReviewResponse create(User author, ReviewRequest req) {
+        requireUser(author);
         var m = meta(req); String excerpt = valueOr(req.excerpt(), excerpt(req.content()));
         Review review = new Review(author, req.title(), req.content(), slug(req.title()), excerpt, req.previewImage(),
                 m.productName(), m.storeName(), m.price(), m.rating(), m.purchaseStatus(), req.tags(), req.publish());
         return response(reviews.save(review), author.getId());
     }
     @Transactional
-    public ReviewDtos.ReviewResponse update(UUID id, User user, ReviewDtos.ReviewRequest req) {
+    public ReviewResponse update(UUID id, User user, ReviewRequest req) {
         Review r = owned(id, user); var m = meta(req);
         r.update(req.title(), req.content(), valueOr(req.excerpt(), excerpt(req.content())), req.previewImage(),
                 m.productName(), m.storeName(), m.price(), m.rating(), m.purchaseStatus(), req.tags());
@@ -32,72 +43,95 @@ public class ReviewService {
         return response(r, user.getId());
     }
     @Transactional public void delete(UUID id, User user) { reviews.delete(owned(id, user)); }
-    @Transactional public ReviewDtos.ReviewResponse publish(UUID id, User user, boolean publish) {
+    @Transactional public ReviewResponse publish(UUID id, User user, boolean publish) {
         Review r = owned(id, user); r.publish(publish); return response(r, user.getId());
     }
     @Transactional(readOnly = true)
-    public ReviewDtos.FeedResponse feed(int page, int limit, String sort, User user) {
+    public FeedResponse feed(int page, int limit, String sort, User user) {
         Sort ordering = "popular".equals(sort) ? Sort.by(Sort.Direction.DESC, "likeCount", "viewCount") : Sort.by(Sort.Direction.DESC, "publishedAt");
-        Page<Review> result = reviews.findByStatus(ReviewStatus.PUBLISHED, PageRequest.of(Math.max(page, 0), Math.min(limit, 50), ordering));
-        return new ReviewDtos.FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
+        Page<Review> result = reviews.findByStatus(ReviewStatus.PUBLISHED, PageRequest.of(Math.max(page, 0), limit(limit), ordering));
+        return new FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
                 result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
     @Transactional(readOnly = true)
-    public ReviewDtos.FeedResponse feedByTag(String tag, int page, int limit, User user) {
-        Page<Review> result = reviews.findPublishedByTag(tag, PageRequest.of(Math.max(page, 0), Math.min(limit, 50), Sort.by("publishedAt").descending()));
-        return new ReviewDtos.FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
+    public FeedResponse feedByTag(String tag, int page, int limit, User user) {
+        Page<Review> result = reviews.findPublishedByTag(tag, PageRequest.of(Math.max(page, 0), limit(limit), Sort.by("publishedAt").descending()));
+        return new FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
                 result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
     @Transactional
-    public ReviewDtos.ReviewResponse get(String slugOrId, User user) {
+    public ReviewResponse get(String slugOrId, User user) {
         Review r;
-        try { r = reviews.findWithAuthorById(UUID.fromString(slugOrId)).orElseThrow(this::missing); }
-        catch (IllegalArgumentException e) { r = reviews.findBySlug(slugOrId).orElseThrow(this::missing); }
-        if (r.getStatus() != ReviewStatus.PUBLISHED && (user == null || !r.getAuthor().getId().equals(user.getId()))) throw missing();
+        try { r = reviews.findLockedById(UUID.fromString(slugOrId)).orElseThrow(this::missing); }
+        catch (IllegalArgumentException e) { r = reviews.findLockedBySlug(slugOrId).orElseThrow(this::missing); }
+        readable(r, user);
         r.increaseViews(); return response(r, id(user));
     }
-    @Transactional(readOnly = true) public ReviewDtos.FeedResponse mine(User user, int page, int limit, boolean draftsOnly) {
-        Page<Review> result = reviews.findByAuthorId(user.getId(), PageRequest.of(page, Math.min(limit, 50), Sort.by("createdAt").descending()));
-        List<ReviewDtos.ReviewResponse> items = result.stream().filter(r -> !draftsOnly || r.getStatus() == ReviewStatus.DRAFT).map(r -> response(r, user.getId())).toList();
-        return new ReviewDtos.FeedResponse(items, result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
+    @Transactional(readOnly = true) public FeedResponse mine(User user, int page, int limit, boolean draftsOnly) {
+        requireUser(user);
+        Page<Review> result = reviews.findByAuthorId(user.getId(), PageRequest.of(Math.max(0, page), limit(limit), Sort.by("createdAt").descending()));
+        List<ReviewResponse> items = result.stream().filter(r -> !draftsOnly || r.getStatus() == ReviewStatus.DRAFT).map(r -> response(r, user.getId())).toList();
+        return new FeedResponse(items, result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
-    @Transactional public Map<String, Object> toggleLike(UUID id, User user) {
-        Review r = reviews.findById(id).orElseThrow(this::missing);
+    @Transactional public LikeResponse toggleLike(UUID id, User user) {
+        requireUser(user);
+        Review r = reviews.findLockedById(id).orElseThrow(this::missing);
+        readable(r, user);
         boolean liked = likes.existsByReviewIdAndUserId(id, user.getId());
         if (liked) { likes.deleteByReviewIdAndUserId(id, user.getId()); r.decreaseLikes(); }
         else { likes.save(new ReviewLike(r, user)); r.increaseLikes(); }
-        return Map.of("liked", !liked, "likeCount", r.getLikeCount());
+        return new LikeResponse(!liked, r.getLikeCount());
     }
-    @Transactional(readOnly = true) public List<ReviewDtos.CommentResponse> comments(UUID reviewId) {
+    @Transactional(readOnly = true) public List<CommentResponse> comments(UUID reviewId, User user) {
+        readable(reviews.findById(reviewId).orElseThrow(this::missing), user);
         return comments.findByReviewIdOrderByCreatedAtAsc(reviewId).stream().map(this::comment).toList();
     }
-    @Transactional public ReviewDtos.CommentResponse addComment(UUID reviewId, User user, String content) {
-        Review r = reviews.findById(reviewId).orElseThrow(this::missing); r.increaseComments();
+    @Transactional public CommentResponse addComment(UUID reviewId, User user, String content) {
+        requireUser(user);
+        Review r = reviews.findLockedById(reviewId).orElseThrow(this::missing);
+        readable(r, user); r.increaseComments();
         return comment(comments.save(new Comment(r, user, content)));
     }
     @Transactional public void deleteComment(UUID id, User user) {
+        requireUser(user);
         Comment c = comments.findById(id).orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다."));
         if (!c.getAuthor().getId().equals(user.getId())) throw new AccessDeniedException("본인의 댓글만 삭제할 수 있습니다.");
-        c.getReview().decreaseComments(); comments.delete(c);
+        Review review = reviews.findLockedById(c.getReview().getId()).orElseThrow(this::missing);
+        review.decreaseComments(); comments.delete(c);
     }
-    @Transactional(readOnly = true) public List<ReviewDtos.ReviewResponse> search(String query, int limit, User user) {
+    @Transactional(readOnly = true) public List<ReviewResponse> search(String query, int limit, User user) {
         if (query == null || query.isBlank()) return List.of();
-        return reviews.search(query.trim(), PageRequest.of(0, Math.min(limit, 50))).stream().map(r -> response(r, id(user))).toList();
+        if (query.length() > 200) throw new IllegalArgumentException("검색어는 200자 이하여야 합니다.");
+        return reviews.search(query.trim(), PageRequest.of(0, limit(limit))).stream().map(r -> response(r, id(user))).toList();
     }
-    @Transactional(readOnly = true) public List<Map<String, Object>> popularTags(int limit) {
-        return reviews.popularTags(PageRequest.of(0, Math.min(limit, 50))).stream().map(v -> Map.<String,Object>of("name", v[0], "postCount", v[1])).toList();
+    @Transactional(readOnly = true) public List<TagResponse> popularTags(int limit) {
+        return reviews.popularTags(PageRequest.of(0, limit(limit))).stream()
+                .map(v -> new TagResponse((String) v[0], ((Number) v[1]).longValue())).toList();
     }
-    private Review owned(UUID id, User user) { Review r = reviews.findWithAuthorById(id).orElseThrow(this::missing); if (!r.getAuthor().getId().equals(user.getId())) throw new AccessDeniedException("본인의 리뷰만 변경할 수 있습니다."); return r; }
-    private ReviewDtos.ReviewResponse response(Review r, UUID viewer) {
-        var metadata = new ReviewDtos.Metadata(r.getProductName(), r.getStoreName(), r.getPrice(), r.getRating(), r.getPurchaseStatus());
-        var author = new ReviewDtos.Author(r.getAuthor().getId().toString(), r.getAuthor().getName(), r.getAuthor().getProfileImageUrl());
+    private Review owned(UUID id, User user) { requireUser(user); Review r = reviews.findLockedById(id).orElseThrow(this::missing); if (!r.getAuthor().getId().equals(user.getId())) throw new AccessDeniedException("본인의 리뷰만 변경할 수 있습니다."); return r; }
+    private void readable(Review review, User user) {
+        if (review.getStatus() == ReviewStatus.PUBLISHED) return;
+        requireUser(user);
+        if (!review.getAuthor().getId().equals(user.getId())) throw new AccessDeniedException("접근 권한이 없습니다.");
+    }
+    private void requireUser(User user) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (user == null || authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof User principal))
+            throw new AuthenticationCredentialsNotFoundException("인증이 필요합니다.");
+        if (!principal.getId().equals(user.getId())) throw new AccessDeniedException("접근 권한이 없습니다.");
+    }
+    private int limit(int value) { return Math.max(1, Math.min(value, 50)); }
+    private ReviewResponse response(Review r, UUID viewer) {
+        var metadata = new ReviewMetadata(r.getProductName(), r.getStoreName(), r.getPrice(), r.getRating(), r.getPurchaseStatus());
+        var author = new AuthorResponse(r.getAuthor().getId().toString(), r.getAuthor().getName(), r.getAuthor().getProfileImageUrl());
         boolean liked = viewer != null && likes.existsByReviewIdAndUserId(r.getId(), viewer);
-        return new ReviewDtos.ReviewResponse(r.getId().toString(), r.getTitle(), r.getContent(), r.getSlug(), r.getExcerpt(), r.getPreviewImage(),
-                r.getTags(), metadata, author, r.getViewCount(), r.getLikeCount(), r.getCommentCount(), liked,
+        return new ReviewResponse(r.getId().toString(), r.getTitle(), r.getContent(), r.getSlug(), r.getExcerpt(), r.getPreviewImage(),
+                new LinkedHashSet<>(r.getTags()), metadata, author, r.getViewCount(), r.getLikeCount(), r.getCommentCount(), liked,
                 r.getStatus().name(), r.getPublishedAt(), r.getCreatedAt(), r.getUpdatedAt());
     }
-    private ReviewDtos.CommentResponse comment(Comment c) { return new ReviewDtos.CommentResponse(c.getId().toString(), c.getContent(), new ReviewDtos.Author(c.getAuthor().getId().toString(), c.getAuthor().getName(), c.getAuthor().getProfileImageUrl()), c.getCreatedAt(), c.getUpdatedAt()); }
-    private ReviewDtos.Metadata meta(ReviewDtos.ReviewRequest req) { return req.metadata() == null ? new ReviewDtos.Metadata(null,null,null,null,null) : req.metadata(); }
+    private CommentResponse comment(Comment c) { return new CommentResponse(c.getId().toString(), c.getContent(), new AuthorResponse(c.getAuthor().getId().toString(), c.getAuthor().getName(), c.getAuthor().getProfileImageUrl()), c.getCreatedAt(), c.getUpdatedAt()); }
+    private ReviewMetadata meta(ReviewRequest req) { return req.metadata() == null ? new ReviewMetadata(null,null,null,null,null) : req.metadata(); }
     private UUID id(User user) { return user == null ? null : user.getId(); }
     private EntityNotFoundException missing() { return new EntityNotFoundException("리뷰를 찾을 수 없습니다."); }
     private String valueOr(String value, String fallback) { return value == null || value.isBlank() ? fallback : value; }

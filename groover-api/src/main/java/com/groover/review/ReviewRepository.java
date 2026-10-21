@@ -4,8 +4,15 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.util.*;
+import jakarta.persistence.LockModeType;
 
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Review r where r.id = :id")
+    Optional<Review> findLockedById(@Param("id") UUID id);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Review r where r.slug = :slug")
+    Optional<Review> findLockedBySlug(@Param("slug") String slug);
     @EntityGraph(attributePaths = "author") Optional<Review> findBySlug(String slug);
     @EntityGraph(attributePaths = "author") Optional<Review> findWithAuthorById(UUID id);
     @EntityGraph(attributePaths = "author") Page<Review> findByStatus(ReviewStatus status, Pageable pageable);

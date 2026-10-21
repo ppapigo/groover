@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import api, { AUTH_EXPIRED_EVENT, getAccessToken, setAccessToken } from '@/lib/api';
+import api, { AUTH_CHANGED_EVENT, AUTH_EXPIRED_EVENT, authenticate, endSession, getAccessToken, getAuthEpoch, refreshSession } from '@/lib/api';
 
 const AuthContext = createContext(null);
 
@@ -12,45 +12,43 @@ export function AuthProvider({ children }) {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const token = getAccessToken();
+    let cancelled = false;
+    const epoch = getAuthEpoch();
     setIsLoading(true);
     setError(null);
-    if (!token) setIsLoading(false);
-    else api.get('/auth/me', { signal: controller.signal })
-      .then(response => { if (getAccessToken() === token) setUser(response.data.data); })
+    const restore = getAccessToken()
+      ? api.get('/auth/me').then(response => response.data.data)
+      : refreshSession().then(session => session.user);
+    restore
+      .then(restored => { if (!cancelled && epoch === getAuthEpoch() && getAccessToken()) setUser(restored); })
       .catch(err => {
-        if (!controller.signal.aborted && err.response?.status !== 401) setError(err);
+        if (!cancelled && epoch === getAuthEpoch() && err.response?.status !== 401 && err.code !== 'ERR_CANCELED') setError(err);
       })
-      .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
-    return () => controller.abort();
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, [attempt]);
 
   useEffect(() => {
     const clearSession = () => { setUser(null); setError(null); queryClient.clear(); };
-    const storageChanged = (event) => {
-      if (event.key === 'accessToken' || event.key === null) { clearSession(); setAttempt(value => value + 1); }
-    };
+    const sessionChanged = () => { clearSession(); setAttempt(value => value + 1); };
     window.addEventListener(AUTH_EXPIRED_EVENT, clearSession);
-    window.addEventListener('storage', storageChanged);
+    window.addEventListener(AUTH_CHANGED_EVENT, sessionChanged);
     return () => {
       window.removeEventListener(AUTH_EXPIRED_EVENT, clearSession);
-      window.removeEventListener('storage', storageChanged);
+      window.removeEventListener(AUTH_CHANGED_EVENT, sessionChanged);
     };
   }, [queryClient]);
 
-  async function authenticate(path, data) {
-    const response = await api.post(path, data);
+  async function signIn(path, data) {
+    const session = await authenticate(path, data);
     queryClient.clear();
-    setAccessToken(response.data.data.accessToken);
-    setUser(response.data.data.user);
+    setUser(session.user);
     setError(null);
     setIsLoading(false);
   }
 
-  function logout() {
-    // The API uses stateless JWTs; logging out discards the local session.
-    setAccessToken(null);
+  async function logout(all = false) {
+    await endSession(all);
     setUser(null);
     setError(null);
     queryClient.clear();
@@ -59,8 +57,9 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={{
     user, isLoading, error, isAuthenticated: Boolean(user), logout,
     retry: () => setAttempt(value => value + 1),
-    login: data => authenticate('/auth/login', data),
-    register: data => authenticate('/auth/register', data),
+    logoutAll: () => logout(true),
+    login: data => signIn('/auth/login', data),
+    register: data => signIn('/auth/register', data),
   }}>{children}</AuthContext.Provider>;
 }
 

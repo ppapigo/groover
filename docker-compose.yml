@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: groover
       POSTGRES_USER: groover
       POSTGRES_PASSWORD: groover
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5433:5432"]
     volumes: ["groover-db:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U groover"]
@@ -15,12 +15,11 @@ services:
   api:
     build: ./groover-api
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       DATABASE_URL: jdbc:postgresql://db:5432/groover
       DATABASE_USERNAME: groover
       DATABASE_PASSWORD: groover
-      JWT_SECRET: change-this-development-secret-to-at-least-32-bytes
-      CORS_ALLOWED_ORIGINS: http://localhost:3001
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
       db:
         condition: service_healthy

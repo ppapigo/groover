@@ -1,5 +1,7 @@
 # 배포 가이드
 
+> 공개 운영 배포에는 [운영 배포 가이드](PRODUCTION.md)와 `docker-compose.production.yml`을 사용하세요. 아래의 기존 Compose 안내는 로컬 개발용입니다. API는 `dev` 프로필을 명시해야 합니다.
+
 ## 환경변수
 
 | 이름 | 필수 | 기본값/설명 |
@@ -7,8 +9,8 @@
 | `DATABASE_URL` | 운영 필수 | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | 운영 필수 | DB 계정 |
 | `DATABASE_PASSWORD` | 운영 필수 | DB 비밀번호 |
-| `JWT_SECRET` | 운영 필수 | 32바이트 이상의 임의 문자열 |
-| `CORS_ALLOWED_ORIGINS` | 권장 | 쉼표로 구분한 웹 Origin |
+| `JWT_SECRET` | 운영 필수 | 최소 32바이트 난수 키의 표준 Base64 문자열 |
+| `SPRING_PROFILES_ACTIVE` | 로컬 필수 | 로컬은 `dev`, 운영은 `prod` |
 | `PORT` | - | `3000` |
 | `VITE_API_URL` | 웹 필수 | 외부 API URL + `/v1` |
 
@@ -22,6 +24,8 @@ docker compose logs -f api
 ```
 
 API 시작 시 Flyway가 스키마를 자동 적용합니다. JPA는 `ddl-auto=validate`로 매핑과 실제 스키마의 일치 여부만 검사합니다.
+
+개발 Compose의 호스트 DB는 `localhost:5433`, API 컨테이너에서는 `db:5432`입니다. API를 직접 실행하려면 `groover-api`에서 `mvn spring-boot:run -Dspring-boot.run.profiles=dev`를 사용합니다. `.env`는 선택 사항이며 예시의 빈 변수는 삭제하거나 값을 채워야 합니다. 운영 비밀값·네트워크·계정 설정은 운영 가이드를 따릅니다.
 
 ## 배포 전 확인
 
@@ -41,7 +45,7 @@ TLS는 리버스 프록시나 클라우드 로드밸런서에서 종료하고, P
 
 ## React 웹 배포
 
-Node.js 20.19+ 또는 22.12+에서 `groover-web`을 빌드하고 `dist/`를 정적 서버에 배포합니다. `VITE_API_URL`은 브라우저에서 접근할 API 주소이며 빌드 시 번들에 포함됩니다. 변경 후에는 재빌드가 필요합니다. `CORS_ALLOWED_ORIGINS`에는 실제 웹 Origin을 설정하세요.
+Node.js 20.19+ 또는 22.12+에서 `groover-web`을 빌드합니다. `VITE_API_URL`은 공개 API 주소이며 빌드 시 번들에 포함됩니다. 운영 Compose는 `/v1`을 설정합니다. 운영 Origin은 `https://grooverapp.com`으로 고정되고 개발 localhost는 `dev` 프로필에만 허용됩니다.
 
 SPA 주소로 직접 접근하거나 새로고침해도 열리도록 fallback을 설정합니다. Nginx 예시:
 

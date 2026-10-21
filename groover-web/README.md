@@ -9,12 +9,20 @@ Groover 리뷰 서비스의 React + Vite 웹 클라이언트입니다. 모든 �
 
 ## 실행
 
+저장소 루트에서 `cd groover-web`으로 이동한 뒤 실행합니다.
+
 ```bash
-npm ci
+npm ci --include=dev
 npm run dev
 ```
 
+설치가 성공한 뒤 개발 서버를 시작하세요. Vite는 개발 의존성이므로 `--include=dev`로 함께 설치합니다. 의존성을 다시 설치할 때는 기존 개발 서버를 `Ctrl+C`로 먼저 종료하세요. Windows에서는 실행 중인 서버가 설치 파일을 잠글 수 있습니다.
+
 웹은 기본적으로 `http://localhost:3001`에서 실행됩니다.
+
+Access token은 메모리에만 저장하고, 새로고침 시 API의 HttpOnly refresh 쿠키로 로그인 상태를 복원합니다. 개발 API는 `dev` 프로필로 실행하고 웹/API 모두 `localhost` 호스트를 사용하세요. `localhost`와 `127.0.0.1`을 섞으면 쿠키와 Origin이 달라집니다. 운영은 HTTPS의 동일 Origin `/v1`을 사용합니다. 인증 POST의 CSRF 토큰 전송과 만료 토큰 갱신은 API 클라이언트가 처리합니다.
+
+`vite`를 찾을 수 없다는 오류가 나면 의존성 설치가 완료되었는지 확인하세요. `Port 3001 is already in use`가 나오면 기존 서버를 이용하거나 종료한 뒤 다시 실행합니다. 웹 화면이 열려도 리뷰 조회·로그인에는 별도로 실행한 API가 필요합니다.
 
 `npm run build`는 정적 파일을 `dist/`에 생성합니다. `npm run preview` 또는 `npm start`로 빌드를 로컬에서 확인할 수 있습니다. 운영에서는 `dist/`를 정적 호스팅에 배포합니다.
 

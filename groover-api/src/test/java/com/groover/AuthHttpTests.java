@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.groover.review.ReviewRepository;
 import com.groover.user.UserRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -12,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Map;
 
@@ -26,6 +28,10 @@ class AuthHttpTests {
     @Autowired TransactionTemplate transactions;
     @Autowired UserRepository users;
     @Autowired ReviewRepository reviews;
+    @Autowired JdbcTemplate jdbc;
+
+    @BeforeEach
+    void resetRateLimits() { AuthTestSupport.enableCsrf(http); jdbc.update("DELETE FROM auth_rate_limits"); }
 
     @AfterEach
     void cleanTestDatabase() {

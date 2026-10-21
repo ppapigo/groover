@@ -3,6 +3,8 @@ package com.groover.review;
 import com.groover.user.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
@@ -22,7 +24,7 @@ public class Review {
     @Column(name = "product_name", length = 120) private String productName;
     @Column(name = "store_name", length = 100) private String storeName;
     @Column(precision = 12, scale = 2) private BigDecimal price;
-    private Integer rating;
+    @JdbcTypeCode(SqlTypes.SMALLINT) private Integer rating;
     @Column(name = "purchase_status", length = 30) private String purchaseStatus;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ReviewStatus status;
     @ElementCollection

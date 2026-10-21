@@ -18,6 +18,8 @@ Spring Data JPA + PostgreSQL
 - Controller는 HTTP 계약과 검증을 담당합니다.
 - Service는 트랜잭션과 소유권 검사 등 유스케이스를 담당합니다.
 - Repository는 Spring Data JPA로 영속성을 담당합니다.
+- 요청·응답 DTO는 도메인별 `dto` 패키지의 개별 파일로 관리하고, 컨트롤러는 구체적인 응답 타입을 명시합니다.
+- 같은 필드·검증 규칙은 DTO를 공유하되 필수 여부, 검증, 기본값, 공개 범위 등이 달라지면 용도별 DTO를 새로 만듭니다. 상세 기준은 [API DTO 규칙](../groover-api/AGENTS.md)을 따릅니다.
 - 엔티티 연관은 지연 로딩을 기본으로 하고 조회 시 `EntityGraph`를 사용합니다.
 - 스키마 변경은 `src/main/resources/db/migration`의 Flyway SQL로 관리합니다.
 - 인증은 서버 세션 없는 Bearer JWT 방식입니다.

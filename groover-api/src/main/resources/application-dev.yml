@@ -1,0 +1,16 @@
+spring:
+  config:
+    import: optional:file:./.env[.properties]
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/groover}
+    username: ${DATABASE_USERNAME:groover}
+    password: ${DATABASE_PASSWORD:groover}
+app:
+  auth:
+    secure-cookies: false
+  cors:
+    allowed-origins: http://localhost:3001
+  jwt:
+    # Empty in dev generates a fresh random signing key on each application start.
+    secret: ${JWT_SECRET:}
+    access-expiration: 3600000
