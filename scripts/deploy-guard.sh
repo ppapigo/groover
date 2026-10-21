@@ -45,7 +45,12 @@ rollback() {
     printf '  %s:\n    image: %s\n' "${services[i]}" "${rollback_refs[i]}" >> "$rollback_file"
   done
   # Override only application image references; never restart dependencies.
-  if ! compose -f "$rollback_file" up -d --no-deps --no-build --wait "${services[@]}"; then
+  if ! compose -f "$rollback_file" up -d --no-deps --no-build --wait "${services[0]}"; then
+    echo "Backend rollback failed" >&2
+    rm -f "$rollback_file"
+    return 1
+  fi
+  if ! compose -f "$rollback_file" up -d --no-deps --no-build --wait "${services[${#services[@]}-1]}"; then
     echo "ROLLBACK FAILED: investigate immediately" >&2
     rm -f "$rollback_file"
     return 1
@@ -54,7 +59,7 @@ rollback() {
   verify || { echo "Rollback health verification failed" >&2; return 1; }
   echo "Previous images restored. Database migrations are NOT reverted." >&2
 }
-if ! { compose up -d --no-deps --no-build --wait "${services[@]}" && verify; }; then
+if ! { compose up -d --no-deps --no-build --wait "${services[0]}" && compose up -d --no-deps --no-build --wait "${services[1]}" && verify; }; then
   rollback || exit 2
   exit 1
 fi
