@@ -76,8 +76,4 @@ jobs:
             export APP_IMAGE_TAG
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-            docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJECT/.env.production" -f "$RELEASE_DIR/docker-compose.production.yml" -f "$RELEASE_DIR/deploy/compose.actions.yml" config --quiet
-            docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJECT/.env.production" -f "$RELEASE_DIR/docker-compose.production.yml" -f "$RELEASE_DIR/deploy/compose.actions.yml" pull api web
-            docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJECT/.env.production" -f "$RELEASE_DIR/docker-compose.production.yml" -f "$RELEASE_DIR/deploy/compose.actions.yml" up -d --no-build --no-deps --wait api
-            docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJECT/.env.production" -f "$RELEASE_DIR/docker-compose.production.yml" -f "$RELEASE_DIR/deploy/compose.actions.yml" up -d --no-build --no-deps --wait web
-            docker compose --project-directory "$RELEASE_DIR" --env-file "$PROJECT/.env.production" -f "$RELEASE_DIR/docker-compose.production.yml" -f "$RELEASE_DIR/deploy/compose.actions.yml" ps
+            bash "$RELEASE_DIR/scripts/deploy-guard.sh"
