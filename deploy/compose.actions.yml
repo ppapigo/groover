@@ -1,0 +1,5 @@
+services:
+  api:
+    image: ghcr.io/ppapigo/groover-api:${APP_IMAGE_TAG:?Set APP_IMAGE_TAG}
+  web:
+    image: ghcr.io/ppapigo/groover-web:${APP_IMAGE_TAG:?Set APP_IMAGE_TAG}
