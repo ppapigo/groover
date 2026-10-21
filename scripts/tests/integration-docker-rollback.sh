@@ -97,7 +97,7 @@ printf 'CI_TEST=1\n' > "$env_file"
   done
 } > "$manifest"
 if [[ "$kind" != board ]]; then
-  printf 'services:\n' > "$project_root/deploy/compose.actions.yml"
+  printf 'services: {}\n' > "$project_root/deploy/compose.actions.yml"
 fi
 compose_actual() {
   if [[ "$kind" == board ]]; then
