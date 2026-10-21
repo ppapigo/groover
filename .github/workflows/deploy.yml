@@ -63,8 +63,11 @@ jobs:
               git clone https://github.com/ppapigo/groover.git "$PROJECT"
             fi
             cd "$PROJECT"
-            git fetch origin main
-            git merge --ff-only origin/main
+            # Explicitly update the remote-tracking ref even if the server repo
+            # was cloned with a single-branch or customized fetch refspec.
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # No hard reset: preserve local changes and refuse divergent history.
+            git merge --ff-only refs/remotes/origin/main
             test -s .env.production || { echo "Missing .env.production; refusing deploy"; exit 1; }
             docker network inspect proxy-net >/dev/null
             export APP_IMAGE_TAG
