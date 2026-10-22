@@ -50,13 +50,13 @@ public class ReviewService {
     public FeedResponse feed(int page, int limit, String sort, User user) {
         Sort ordering = "popular".equals(sort) ? Sort.by(Sort.Direction.DESC, "likeCount", "viewCount") : Sort.by(Sort.Direction.DESC, "publishedAt");
         Page<Review> result = reviews.findByStatus(ReviewStatus.PUBLISHED, PageRequest.of(Math.max(page, 0), limit(limit), ordering));
-        return new FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
+        return new FeedResponse(responses(result.getContent(), id(user)),
                 result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
     @Transactional(readOnly = true)
     public FeedResponse feedByTag(String tag, int page, int limit, User user) {
         Page<Review> result = reviews.findPublishedByTag(tag, PageRequest.of(Math.max(page, 0), limit(limit), Sort.by("publishedAt").descending()));
-        return new FeedResponse(result.stream().map(r -> response(r, id(user))).toList(),
+        return new FeedResponse(responses(result.getContent(), id(user)),
                 result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
     @Transactional
@@ -70,7 +70,8 @@ public class ReviewService {
     @Transactional(readOnly = true) public FeedResponse mine(User user, int page, int limit, boolean draftsOnly) {
         requireUser(user);
         Page<Review> result = reviews.findByAuthorId(user.getId(), PageRequest.of(Math.max(0, page), limit(limit), Sort.by("createdAt").descending()));
-        List<ReviewResponse> items = result.stream().filter(r -> !draftsOnly || r.getStatus() == ReviewStatus.DRAFT).map(r -> response(r, user.getId())).toList();
+        List<ReviewResponse> items = responses(result.getContent().stream()
+                .filter(r -> !draftsOnly || r.getStatus() == ReviewStatus.DRAFT).toList(), user.getId());
         return new FeedResponse(items, result.hasNext() ? String.valueOf(page + 1) : null, result.hasNext());
     }
     @Transactional public LikeResponse toggleLike(UUID id, User user) {
@@ -102,7 +103,7 @@ public class ReviewService {
     @Transactional(readOnly = true) public List<ReviewResponse> search(String query, int limit, User user) {
         if (query == null || query.isBlank()) return List.of();
         if (query.length() > 200) throw new IllegalArgumentException("검색어는 200자 이하여야 합니다.");
-        return reviews.search(query.trim(), PageRequest.of(0, limit(limit))).stream().map(r -> response(r, id(user))).toList();
+        return responses(reviews.search(query.trim(), PageRequest.of(0, limit(limit))), id(user));
     }
     @Transactional(readOnly = true) public List<TagResponse> popularTags(int limit) {
         return reviews.popularTags(PageRequest.of(0, limit(limit))).stream()
@@ -122,12 +123,28 @@ public class ReviewService {
         if (!principal.getId().equals(user.getId())) throw new AccessDeniedException("접근 권한이 없습니다.");
     }
     private int limit(int value) { return Math.max(1, Math.min(value, 50)); }
+    /** Populate page-level attributes in bulk; do not join-fetch collections while paginating. */
+    private List<ReviewResponse> responses(List<Review> rows, UUID viewer) {
+        if (rows.isEmpty()) return List.of();
+        List<UUID> ids = rows.stream().map(Review::getId).toList();
+        Map<UUID, Set<String>> tags = new HashMap<>();
+        for (Object[] row : reviews.findTagsByReviewIds(ids)) {
+            tags.computeIfAbsent((UUID) row[0], ignored -> new LinkedHashSet<>()).add((String) row[1]);
+        }
+        Set<UUID> liked = viewer == null ? Set.of() :
+                new HashSet<>(likes.findLikedReviewIds(viewer, ids));
+        return rows.stream().map(r -> response(r,
+                tags.getOrDefault(r.getId(), Set.of()), liked.contains(r.getId()))).toList();
+    }
     private ReviewResponse response(Review r, UUID viewer) {
+        return response(r, new LinkedHashSet<>(r.getTags()),
+                viewer != null && likes.existsByReviewIdAndUserId(r.getId(), viewer));
+    }
+    private ReviewResponse response(Review r, Set<String> tags, boolean liked) {
         var metadata = new ReviewMetadata(r.getProductName(), r.getStoreName(), r.getPrice(), r.getRating(), r.getPurchaseStatus());
         var author = new AuthorResponse(r.getAuthor().getId().toString(), r.getAuthor().getName(), r.getAuthor().getProfileImageUrl());
-        boolean liked = viewer != null && likes.existsByReviewIdAndUserId(r.getId(), viewer);
         return new ReviewResponse(r.getId().toString(), r.getTitle(), r.getContent(), r.getSlug(), r.getExcerpt(), r.getPreviewImage(),
-                new LinkedHashSet<>(r.getTags()), metadata, author, r.getViewCount(), r.getLikeCount(), r.getCommentCount(), liked,
+                new LinkedHashSet<>(tags), metadata, author, r.getViewCount(), r.getLikeCount(), r.getCommentCount(), liked,
                 r.getStatus().name(), r.getPublishedAt(), r.getCreatedAt(), r.getUpdatedAt());
     }
     private CommentResponse comment(Comment c) { return new CommentResponse(c.getId().toString(), c.getContent(), new AuthorResponse(c.getAuthor().getId().toString(), c.getAuthor().getName(), c.getAuthor().getProfileImageUrl()), c.getCreatedAt(), c.getUpdatedAt()); }

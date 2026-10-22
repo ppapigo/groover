@@ -7,6 +7,10 @@ import java.util.*;
 import jakarta.persistence.LockModeType;
 
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
+    // Page rows first, then fetch all page tags in one query (avoids a collection-fetch pagination join).
+    @Query("select r.id, tag from Review r join r.tags tag where r.id in :reviewIds")
+    List<Object[]> findTagsByReviewIds(@Param("reviewIds") Collection<UUID> reviewIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Review r where r.id = :id")
     Optional<Review> findLockedById(@Param("id") UUID id);
