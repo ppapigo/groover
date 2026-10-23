@@ -2,7 +2,8 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 script="$repo_root/scripts/deploy-guard.sh"
-for scenario in success fail_frontend; do
+for scenario in success fail_frontend web_redirect wrong_web api_redirect wrong_api api_failure; do
+  export MOCK_SCENARIO="$scenario"
   tmp="$(mktemp -d)"
   export MOCK_LOG="$tmp/docker.log" MOCK_FAIL_MARKER="$tmp/failed-once"
   export MOCK_FAIL_FRONTEND=0
@@ -42,8 +43,25 @@ esac
 MOCK_DOCKER
   cat > "$tmp/bin/curl" <<'MOCK_CURL'
 #!/usr/bin/env bash
+set -euo pipefail
 echo "curl $*" >> "$MOCK_LOG"
-exit 0
+url="${!#}"
+case "$url" in
+  https://groover.grooverapp.com/) body='<title>Groover — 후기를 고르는 더 나은 방법</title>'; code=200 ;;
+  https://groover.grooverapp.com/v1/health) body='{"status":"UP"}'; code=200 ;;
+  *) echo "Unexpected URL: $url" >&2; exit 2 ;;
+esac
+# Fail once; the rollback must recheck the restored public service.
+if [[ ! -f "$MOCK_FAIL_MARKER" ]]; then
+  case "$MOCK_SCENARIO:$url" in
+    web_redirect:*/) code=302; touch "$MOCK_FAIL_MARKER" ;;
+    wrong_web:*/) body='<title>Other service</title>'; touch "$MOCK_FAIL_MARKER" ;;
+    api_redirect:*/health) code=302; touch "$MOCK_FAIL_MARKER" ;;
+    wrong_api:*/health) body='<html>SPA fallback</html>'; touch "$MOCK_FAIL_MARKER" ;;
+    api_failure:*/health) touch "$MOCK_FAIL_MARKER"; exit 22 ;;
+  esac
+fi
+printf '%s\n%s' "$body" "$code"
 MOCK_CURL
   chmod +x "$tmp/bin/docker" "$tmp/bin/curl"
   : > "$MOCK_LOG"

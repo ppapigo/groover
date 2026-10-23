@@ -32,8 +32,8 @@ public class ProductionSecurityValidator {
         if (decodedKey.contains("test-only") || decodedKey.contains("development")
                 || decodedKey.contains("change-this") || decodedKey.contains("password"))
             fail("Production JWT_SECRET must not be a known test or development key.");
-        if (!"https://grooverapp.com".equals(env.getProperty("app.cors.allowed-origins")))
-            fail("Production CORS must allow only https://grooverapp.com.");
+        if (!"https://groover.grooverapp.com".equals(env.getProperty("app.cors.allowed-origins")))
+            fail("Production CORS must allow only https://groover.grooverapp.com.");
         if (!"validate".equals(env.getProperty("spring.jpa.hibernate.ddl-auto"))
                 || !env.getProperty("spring.flyway.enabled", Boolean.class, false)
                 || !env.getProperty("spring.flyway.clean-disabled", Boolean.class, false))

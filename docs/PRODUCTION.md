@@ -59,7 +59,7 @@ TLS와 HSTS는 Caddy 사이트 블록에서 처리합니다. 기존 인증서 �
 ## 인증과 브라우저
 
 - 회원가입은 이메일 인증 없이 바로 계정을 생성하고 JWT를 반환합니다.
-- 운영 Origin은 `https://grooverapp.com` 하나이며 인증 쿠키를 위해 credentials를 허용합니다. 개발 `localhost:3001`은 `dev` 설정에만 있습니다.
+- 운영 Origin은 `https://groover.grooverapp.com` 하나이며 인증 쿠키를 위해 credentials를 허용합니다. 개발 `localhost:3001`은 `dev` 설정에만 있습니다.
 - JWT는 HS256 서명/발급자/대상/만료/발급 시각/사용자 및 `sid` 세션 상태를 검사합니다. 운영 access token 유효기간은 15분, DB 로그인 세션은 7일(고정 만료)입니다.
 - **JWT_SECRET 교체는 이전 access token을 무효화합니다.** Refresh token은 DB 세션으로 관리되므로 계속 갱신할 수 있습니다. 키 유출 대응으로 전체 재로그인이 필요하면 별도 승인 절차로 모든 DB 세션도 폐기해야 합니다. `sid`가 없는 이전 클라이언트 토큰은 전환 시 재로그인이 필요합니다.
 - Access token은 프론트 메모리에만 보관하며 이전 localStorage 값을 제거합니다. 새로고침 시 HttpOnly refresh 쿠키로 세션을 복원합니다. 운영 쿠키는 `__Host-` 접두사, Secure, SameSite=Strict, Path=/, Domain 없음입니다.
@@ -133,3 +133,18 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 개발 기본 DB는 `localhost:5433`, 계정/비밀번호는 개발 Compose의 `groover`입니다. `.env`는 선택 사항이며 빈 변수는 삭제하거나 필요한 값을 채우세요. 이전 `.env`의 일반 문자열 JWT 키는 제거(개발 재시작마다 임시 키 생성)하거나 새 Base64 난수 키로 교체해야 합니다. 빈 `.env.example`을 그대로 복사하면 DB 연결에 실패할 수 있습니다.
+
+
+## 서브도메인 전환 및 배포 판정
+
+운영 Origin은 `https://groover.grooverapp.com`입니다. main push는 독립 배포 workflow를 시작하므로 병합 전에 서버 상태를 확인합니다.
+
+- 기존 Caddyfile 전체를 예제로 덮어쓰지 않습니다. Groover 사이트 블록만 검토하고 MOA, AChat, 루트 도메인 라우팅을 보존합니다. 실제 설정에 `caddy validate`를 실행한 후 reload합니다.
+- DNS A/AAAA, HTTPS 인증서, `proxy-net`의 `groover-web` 별칭, 실제 Caddy IP와 `CADDY_PROXY_IP`, 웹 내부 IP와 `TRUSTED_PROXY_IPS` 일치를 확인합니다.
+- 기존 Groover 외부 DB 볼륨과 백업/복원 가능성, 서버 메모리/디스크 여유를 확인합니다. DB, Redis, Caddy를 재생성하거나 `down -v`를 실행하지 않습니다.
+- `deploy-guard.sh`는 API/웹 컨테이너 health와 공개 웹의 HTTP 200 및 Groover title, `/v1/health`의 HTTP 200 및 `{"status":"UP"}`을 검사합니다. 리다이렉트는 따라가지 않습니다. 웹 title 변경 시 검증과 fixture도 함께 갱신합니다.
+- health 응답은 DB 가용성을 보장하지 않습니다. 배포 이후 DB를 사용하는 피드/검색을 확인하고 로그인 → 새로고침 → refresh → 로그아웃을 브라우저에서 검증합니다.
+- 쿠키는 `__Host-` 이름, Secure, HttpOnly, SameSite=Strict, Path=/, Domain 없음을 유지합니다. 루트 도메인의 host-only 쿠키는 이전되지 않아 재로그인이 필요할 수 있습니다.
+- 새 Origin과 X-CSRF-TOKEN preflight는 허용하고 루트/MOA/AChat/외부 Origin은 거부합니다. CSRF 없는 인증 POST는 거부되어야 합니다.
+- 배포 전후 MOA/AChat 화면·인증·채팅을 비교합니다. 기존 라우팅과 컨테이너/볼륨을 보존합니다.
+- 실패 시 이전 API/웹 이미지로 복구하고 같은 공개 URL 검사를 반복합니다. DB migration은 이미지 롤백으로 되돌아가지 않습니다. 이전 이미지도 공개 검사에 실패하면 복구 완료로 판단하지 않습니다.

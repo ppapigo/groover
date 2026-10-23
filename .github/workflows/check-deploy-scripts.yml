@@ -2,7 +2,7 @@ name: Validate deployment shell scripts
 on:
   pull_request:
     paths:
-      - 'scripts/deploy-guard.sh'
+      - 'scripts/**'
       - '.github/workflows/check-deploy-scripts.yml'
   workflow_dispatch:
 permissions:

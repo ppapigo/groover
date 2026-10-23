@@ -34,7 +34,22 @@ verify() {
     status="$(docker inspect --type container --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing-healthcheck{{end}}' "$container")" || return 1
     [[ "$status" == healthy ]] || { echo "Health check failed for $container: $status" >&2; return 1; }
   done
-  curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 --output /dev/null "https://grooverapp.com"
+  # Do not follow redirects: another service must never satisfy this check.
+  local response status body
+  response="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 \
+    --write-out '\n%{http_code}' "https://groover.grooverapp.com/")" || return 1
+  status="${response##*$'\n'}"
+  body="${response%$'\n'*}"
+  [[ "$status" == 200 && "$body" == *'<title>Groover — 후기를 고르는 더 나은 방법</title>'* ]] || {
+    echo "Groover web response verification failed" >&2; return 1;
+  }
+  response="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 \
+    --write-out '\n%{http_code}' "https://groover.grooverapp.com/v1/health")" || return 1
+  status="${response##*$'\n'}"
+  body="${response%$'\n'*}"
+  [[ "$status" == 200 && "$(printf '%s' "$body" | tr -d '[:space:]')" == '{"status":"UP"}' ]] || {
+    echo "Groover API response verification failed" >&2; return 1;
+  }
 }
 rollback() {
   echo "Deployment failed; restoring previous immutable image IDs" >&2

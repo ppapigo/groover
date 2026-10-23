@@ -53,6 +53,6 @@ app:
     secret: ${JWT_SECRET:}
     access-expiration: 900000
   cors:
-    allowed-origins: https://grooverapp.com
+    allowed-origins: https://groover.grooverapp.com
   security:
     trusted-proxies: ${TRUSTED_PROXY_IPS:}

@@ -25,7 +25,7 @@ class SecurityConfigurationTests {
                 .withProperty("spring.datasource.username", "groover")
                 .withProperty("spring.datasource.password", UUID.randomUUID().toString() + UUID.randomUUID())
                 .withProperty("app.jwt.secret", randomKey())
-                .withProperty("app.cors.allowed-origins", "https://grooverapp.com")
+                .withProperty("app.cors.allowed-origins", "https://groover.grooverapp.com")
                 .withProperty("spring.jpa.hibernate.ddl-auto", "validate")
                 .withProperty("spring.flyway.enabled", "true")
                 .withProperty("spring.flyway.clean-disabled", "true")

@@ -30,7 +30,13 @@ cat > "$root/bin/curl" <<'WRAP'
 set -euo pipefail
 args=()
 for a in "$@"; do
-  if [[ "$a" == https://* ]]; then a=http://127.0.0.1:19091/health; fi
+  if [[ "$a" == https://* ]]; then
+    case "$a" in
+      https://groover.grooverapp.com/) a=http://127.0.0.1:19091/ ;;
+      https://groover.grooverapp.com/v1/health) a=http://127.0.0.1:19091/v1/health ;;
+      *) echo "Unexpected public URL: $a" >&2; exit 2 ;;
+    esac
+  fi
   args+=("$a")
 done
 exec "$REAL_CURL" "${args[@]}"
@@ -43,7 +49,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(503 if os.getenv("RELEASE") == "broken" else 200)
         self.end_headers()
-        self.wfile.write(os.getenv("RELEASE", "").encode())
+        body = '<title>Groover — 후기를 고르는 더 나은 방법</title>' if self.path == '/' else '{"status":"UP"}'
+        self.wfile.write(body.encode())
 HTTPServer(("0.0.0.0", 8080), H).serve_forever()
 PY
 cat > "$root/Dockerfile" <<'DOCKERFILE'

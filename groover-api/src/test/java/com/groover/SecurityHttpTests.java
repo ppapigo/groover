@@ -26,7 +26,7 @@ import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "server.servlet.context-path=/v1", "app.cors.allowed-origins=https://grooverapp.com"
+        "server.servlet.context-path=/v1", "app.cors.allowed-origins=https://groover.grooverapp.com"
 })
 class SecurityHttpTests {
     @DynamicPropertySource
@@ -237,13 +237,13 @@ class SecurityHttpTests {
         assertThat(reviews.findById(published.getId()).orElseThrow().getLikeCount()).isZero();
     }
     @Test void productionCorsOnlyAllowsTheProductionOriginAndExplicitHeaders() {
-        for (String origin : List.of("https://grooverapp.com", "https://evil.example", "http://localhost:3001")) {
+        for (String origin : List.of("https://groover.grooverapp.com", "https://grooverapp.com", "https://board.grooverapp.com", "https://achat.grooverapp.com", "https://evil.example", "http://localhost:3001")) {
             HttpHeaders headers = new HttpHeaders();
             headers.setOrigin(origin); headers.setAccessControlRequestMethod(HttpMethod.POST);
-            headers.setAccessControlRequestHeaders(List.of("authorization", "content-type"));
+            headers.setAccessControlRequestHeaders(List.of("authorization", "content-type", "x-csrf-token"));
             var result = http.exchange("/auth/login", HttpMethod.OPTIONS, new HttpEntity<>(headers), String.class);
-            assertThat(result.getStatusCode()).isEqualTo(origin.equals("https://grooverapp.com") ? HttpStatus.OK : HttpStatus.FORBIDDEN);
-            assertThat(result.getHeaders().getAccessControlAllowCredentials()).isEqualTo(origin.equals("https://grooverapp.com"));
+            assertThat(result.getStatusCode()).isEqualTo(origin.equals("https://groover.grooverapp.com") ? HttpStatus.OK : HttpStatus.FORBIDDEN);
+            assertThat(result.getHeaders().getAccessControlAllowCredentials()).isEqualTo(origin.equals("https://groover.grooverapp.com"));
         }
     }
     @Test void logoutImmediatelyRevokesTheAccessToken() {
