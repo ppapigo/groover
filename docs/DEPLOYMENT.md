@@ -45,7 +45,7 @@ TLS는 리버스 프록시나 클라우드 로드밸런서에서 종료하고, P
 
 ## React 웹 배포
 
-Node.js 20.19+ 또는 22.12+에서 `groover-web`을 빌드합니다. `VITE_API_URL`은 공개 API 주소이며 빌드 시 번들에 포함됩니다. 운영 Compose는 `/v1`을 설정합니다. 운영 Origin은 `https://grooverapp.com`으로 고정되고 개발 localhost는 `dev` 프로필에만 허용됩니다.
+Node.js 20.19+ 또는 22.12+에서 `groover-web`을 빌드합니다. `VITE_API_URL`은 공개 API 주소이며 빌드 시 번들에 포함됩니다. 운영 Compose는 `/v1`을 설정합니다. 운영 Origin은 `https://groover.grooverapp.com`으로 고정되고 개발 localhost는 `dev` 프로필에만 허용됩니다.
 
 SPA 주소로 직접 접근하거나 새로고침해도 열리도록 fallback을 설정합니다. Nginx 예시:
 

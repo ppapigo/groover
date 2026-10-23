@@ -1,0 +1,80 @@
+name: Deploy Groover independently
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: groover-production
+  cancel-in-progress: false
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: ./groover-api
+
+          push: true
+          tags: ghcr.io/ppapigo/groover-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: ./groover-web
+
+          push: true
+          tags: ghcr.io/ppapigo/groover-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy Groover without changing shared proxy or database
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_IMAGE_TAG: ${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: APP_IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          command_timeout: 30m
+          script: |
+            set -eu
+            # Keep the existing server checkout (which may have local-only commits) untouched.
+            # Compose still uses the existing Groover production environment and external DB volume.
+            PROJECT="$HOME/groover"
+            test -s "$PROJECT/.env.production" || { echo "Existing Groover .env.production missing; refusing deploy"; exit 1; }
+            test -d "$PROJECT/.git" || { echo "Expected existing Groover checkout missing"; exit 1; }
+            DEPLOY_ROOT="$HOME/.groover-actions/releases"
+            RELEASE_DIR="$DEPLOY_ROOT/$APP_IMAGE_TAG"
+            mkdir -p "$DEPLOY_ROOT"
+            if [ ! -e "$RELEASE_DIR" ]; then
+              git clone --quiet --depth 1 --branch main https://github.com/ppapigo/groover.git "$RELEASE_DIR"
+            fi
+            test -d "$RELEASE_DIR/.git" || { echo "Release checkout invalid"; exit 1; }
+            ACTUAL_SHA="$(git -C "$RELEASE_DIR" rev-parse HEAD)"
+            test "$ACTUAL_SHA" = "$APP_IMAGE_TAG" || { echo "Release SHA mismatch: expected $APP_IMAGE_TAG; got $ACTUAL_SHA"; exit 1; }
+            export PROJECT RELEASE_DIR
+            cd "$RELEASE_DIR"
+            docker network inspect proxy-net >/dev/null
+            export APP_IMAGE_TAG
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+            bash "$RELEASE_DIR/scripts/deploy-guard.sh"
